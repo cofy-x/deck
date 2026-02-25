@@ -1,0 +1,331 @@
+/**
+ * @license
+ * Copyright 2026 cofy-x
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
+import { z } from 'zod';
+
+const ChannelNameSchema = z.enum([
+  'telegram',
+  'whatsapp',
+  'slack',
+  'feishu',
+  'discord',
+  'dingtalk',
+  'email',
+  'mochat',
+  'qq',
+]);
+
+const AccessPolicySchema = z.enum(['open', 'allowlist', 'pairing', 'disabled']);
+
+const ModelRefSchema = z.object({
+  providerID: z.string().min(1),
+  modelID: z.string().min(1),
+});
+
+const WhatsAppAccountConfigSchema = z.object({
+  authDir: z.string().optional(),
+  sendReadReceipts: z.boolean().optional(),
+});
+
+const WhatsAppChannelConfigSchema = z.object({
+  accessPolicy: AccessPolicySchema.optional(),
+  allowFrom: z.array(z.string()).optional(),
+  selfChatMode: z.boolean().optional(),
+  accounts: z.record(z.string(), WhatsAppAccountConfigSchema).optional(),
+});
+
+const TelegramChannelConfigSchema = z.object({
+  token: z.string().optional(),
+  enabled: z.boolean().optional(),
+  accessPolicy: AccessPolicySchema.optional(),
+  thinkingMode: z.enum(['off', 'summary', 'raw_debug']).optional(),
+});
+
+const SlackChannelConfigSchema = z.object({
+  botToken: z.string().optional(),
+  appToken: z.string().optional(),
+  enabled: z.boolean().optional(),
+  accessPolicy: AccessPolicySchema.optional(),
+});
+
+const FeishuChannelConfigSchema = z.object({
+  webhookUrl: z.string().optional(),
+  verificationToken: z.string().optional(),
+  eventPort: z.number().int().optional(),
+  eventPath: z.string().optional(),
+  enabled: z.boolean().optional(),
+  accessPolicy: AccessPolicySchema.optional(),
+});
+
+const DiscordChannelConfigSchema = z.object({
+  token: z.string().optional(),
+  mentionInGuilds: z.boolean().optional(),
+  enabled: z.boolean().optional(),
+  accessPolicy: AccessPolicySchema.optional(),
+});
+
+const DingTalkChannelConfigSchema = z.object({
+  webhookUrl: z.string().optional(),
+  signSecret: z.string().optional(),
+  verificationToken: z.string().optional(),
+  eventPort: z.number().int().optional(),
+  eventPath: z.string().optional(),
+  enabled: z.boolean().optional(),
+  accessPolicy: AccessPolicySchema.optional(),
+});
+
+const EmailChannelConfigSchema = z.object({
+  enabled: z.boolean().optional(),
+  imapHost: z.string().optional(),
+  imapPort: z.number().int().optional(),
+  imapSecure: z.boolean().optional(),
+  imapUser: z.string().optional(),
+  imapPassword: z.string().optional(),
+  imapMailbox: z.string().optional(),
+  pollIntervalSeconds: z.number().int().optional(),
+  smtpHost: z.string().optional(),
+  smtpPort: z.number().int().optional(),
+  smtpSecure: z.boolean().optional(),
+  smtpUser: z.string().optional(),
+  smtpPassword: z.string().optional(),
+  fromAddress: z.string().optional(),
+  subjectPrefix: z.string().optional(),
+  autoReplyEnabled: z.boolean().optional(),
+  accessPolicy: AccessPolicySchema.optional(),
+});
+
+const MochatChannelConfigSchema = z.object({
+  enabled: z.boolean().optional(),
+  baseUrl: z.string().optional(),
+  clawToken: z.string().optional(),
+  sessions: z.array(z.string()).optional(),
+  pollIntervalMs: z.number().int().optional(),
+  watchTimeoutMs: z.number().int().optional(),
+  watchLimit: z.number().int().optional(),
+  accessPolicy: AccessPolicySchema.optional(),
+});
+
+const QqChannelConfigSchema = z.object({
+  enabled: z.boolean().optional(),
+  apiBaseUrl: z.string().optional(),
+  accessToken: z.string().optional(),
+  webhookPort: z.number().int().optional(),
+  webhookPath: z.string().optional(),
+  accessPolicy: AccessPolicySchema.optional(),
+});
+
+const ChannelsConfigSchema = z.object({
+  whatsapp: WhatsAppChannelConfigSchema.optional(),
+  telegram: TelegramChannelConfigSchema.optional(),
+  slack: SlackChannelConfigSchema.optional(),
+  feishu: FeishuChannelConfigSchema.optional(),
+  discord: DiscordChannelConfigSchema.optional(),
+  dingtalk: DingTalkChannelConfigSchema.optional(),
+  email: EmailChannelConfigSchema.optional(),
+  mochat: MochatChannelConfigSchema.optional(),
+  qq: QqChannelConfigSchema.optional(),
+});
+
+export const ConfigFileSchema = z.object({
+  version: z.number().int().default(1),
+  opencodeUrl: z.string().optional(),
+  opencodeDirectory: z.string().optional(),
+  groupsEnabled: z.boolean().optional(),
+  channels: ChannelsConfigSchema.optional(),
+});
+
+export const EnvSchema = z
+  .object({
+    BRIDGE_CONFIG_PATH: z.string().optional(),
+    BRIDGE_DATA_DIR: z.string().optional(),
+    BRIDGE_DB_PATH: z.string().optional(),
+    BRIDGE_LOG_FILE: z.string().optional(),
+    BRIDGE_HEALTH_PORT: z.string().optional(),
+    BRIDGE_MODEL: z.string().optional(),
+    OPENCODE_URL: z.string().optional(),
+    OPENCODE_DIRECTORY: z.string().optional(),
+    OPENCODE_SERVER_USERNAME: z.string().optional(),
+    OPENCODE_SERVER_PASSWORD: z.string().optional(),
+    TOOL_OUTPUT_LIMIT: z.string().optional(),
+    TOOL_UPDATES_ENABLED: z.string().optional(),
+    PERMISSION_MODE: z.string().optional(),
+    GROUPS_ENABLED: z.string().optional(),
+    LOG_LEVEL: z.string().optional(),
+    TELEGRAM_BOT_TOKEN: z.string().optional(),
+    TELEGRAM_ENABLED: z.string().optional(),
+    TELEGRAM_THINKING_MODE: z.string().optional(),
+    SLACK_BOT_TOKEN: z.string().optional(),
+    SLACK_APP_TOKEN: z.string().optional(),
+    SLACK_ENABLED: z.string().optional(),
+    FEISHU_WEBHOOK_URL: z.string().optional(),
+    FEISHU_VERIFICATION_TOKEN: z.string().optional(),
+    FEISHU_EVENT_PORT: z.string().optional(),
+    FEISHU_EVENT_PATH: z.string().optional(),
+    FEISHU_ENABLED: z.string().optional(),
+    DISCORD_BOT_TOKEN: z.string().optional(),
+    DISCORD_MENTION_IN_GUILDS: z.string().optional(),
+    DISCORD_GATEWAY_PROXY_URL: z.string().optional(),
+    DISCORD_GATEWAY_HANDSHAKE_TIMEOUT_MS: z.string().optional(),
+    DISCORD_ENABLED: z.string().optional(),
+    DINGTALK_WEBHOOK_URL: z.string().optional(),
+    DINGTALK_SIGN_SECRET: z.string().optional(),
+    DINGTALK_VERIFICATION_TOKEN: z.string().optional(),
+    DINGTALK_EVENT_PORT: z.string().optional(),
+    DINGTALK_EVENT_PATH: z.string().optional(),
+    DINGTALK_ENABLED: z.string().optional(),
+    EMAIL_ENABLED: z.string().optional(),
+    EMAIL_IMAP_HOST: z.string().optional(),
+    EMAIL_IMAP_PORT: z.string().optional(),
+    EMAIL_IMAP_SECURE: z.string().optional(),
+    EMAIL_IMAP_USER: z.string().optional(),
+    EMAIL_IMAP_PASSWORD: z.string().optional(),
+    EMAIL_IMAP_MAILBOX: z.string().optional(),
+    EMAIL_POLL_INTERVAL_SECONDS: z.string().optional(),
+    EMAIL_SMTP_HOST: z.string().optional(),
+    EMAIL_SMTP_PORT: z.string().optional(),
+    EMAIL_SMTP_SECURE: z.string().optional(),
+    EMAIL_SMTP_USER: z.string().optional(),
+    EMAIL_SMTP_PASSWORD: z.string().optional(),
+    EMAIL_FROM_ADDRESS: z.string().optional(),
+    EMAIL_SUBJECT_PREFIX: z.string().optional(),
+    EMAIL_AUTO_REPLY_ENABLED: z.string().optional(),
+    MOCHAT_ENABLED: z.string().optional(),
+    MOCHAT_BASE_URL: z.string().optional(),
+    MOCHAT_CLAW_TOKEN: z.string().optional(),
+    MOCHAT_SESSIONS: z.string().optional(),
+    MOCHAT_POLL_INTERVAL_MS: z.string().optional(),
+    MOCHAT_WATCH_TIMEOUT_MS: z.string().optional(),
+    MOCHAT_WATCH_LIMIT: z.string().optional(),
+    QQ_ENABLED: z.string().optional(),
+    QQ_API_BASE_URL: z.string().optional(),
+    QQ_ACCESS_TOKEN: z.string().optional(),
+    QQ_WEBHOOK_PORT: z.string().optional(),
+    QQ_WEBHOOK_PATH: z.string().optional(),
+    WHATSAPP_ENABLED: z.string().optional(),
+    WHATSAPP_ACCOUNT_ID: z.string().optional(),
+    WHATSAPP_AUTH_DIR: z.string().optional(),
+    WHATSAPP_SELF_CHAT: z.string().optional(),
+    ACCESS_POLICY_TELEGRAM: z.string().optional(),
+    ACCESS_POLICY_WHATSAPP: z.string().optional(),
+    ACCESS_POLICY_SLACK: z.string().optional(),
+    ACCESS_POLICY_FEISHU: z.string().optional(),
+    ACCESS_POLICY_DISCORD: z.string().optional(),
+    ACCESS_POLICY_DINGTALK: z.string().optional(),
+    ACCESS_POLICY_EMAIL: z.string().optional(),
+    ACCESS_POLICY_MOCHAT: z.string().optional(),
+    ACCESS_POLICY_QQ: z.string().optional(),
+    ALLOW_FROM: z.string().optional(),
+    ALLOW_FROM_TELEGRAM: z.string().optional(),
+    ALLOW_FROM_WHATSAPP: z.string().optional(),
+    ALLOW_FROM_SLACK: z.string().optional(),
+    ALLOW_FROM_FEISHU: z.string().optional(),
+    ALLOW_FROM_DISCORD: z.string().optional(),
+    ALLOW_FROM_DINGTALK: z.string().optional(),
+    ALLOW_FROM_EMAIL: z.string().optional(),
+    ALLOW_FROM_MOCHAT: z.string().optional(),
+    ALLOW_FROM_QQ: z.string().optional(),
+  })
+  .loose();
+
+const AllowlistSchema = z.object({
+  telegram: z.set(z.string()),
+  whatsapp: z.set(z.string()),
+  slack: z.set(z.string()),
+  feishu: z.set(z.string()),
+  discord: z.set(z.string()),
+  dingtalk: z.set(z.string()),
+  email: z.set(z.string()),
+  mochat: z.set(z.string()),
+  qq: z.set(z.string()),
+});
+
+export const ConfigSchema = z.object({
+  configPath: z.string(),
+  configFile: ConfigFileSchema,
+  opencodeUrl: z.string(),
+  opencodeDirectory: z.string(),
+  opencodeUsername: z.string().optional(),
+  opencodePassword: z.string().optional(),
+  model: ModelRefSchema.optional(),
+  telegramToken: z.string().optional(),
+  telegramEnabled: z.boolean(),
+  telegramThinkingMode: z.enum(['off', 'summary', 'raw_debug']).optional(),
+  slackBotToken: z.string().optional(),
+  slackAppToken: z.string().optional(),
+  slackEnabled: z.boolean(),
+  feishuWebhookUrl: z.string().optional(),
+  feishuVerificationToken: z.string().optional(),
+  feishuEventPort: z.number().int(),
+  feishuEventPath: z.string(),
+  feishuEnabled: z.boolean(),
+  discordToken: z.string().optional(),
+  discordMentionInGuilds: z.boolean(),
+  discordGatewayProxyUrl: z.string().optional(),
+  discordGatewayHandshakeTimeoutMs: z.number().int().positive().optional(),
+  discordEnabled: z.boolean(),
+  dingtalkWebhookUrl: z.string().optional(),
+  dingtalkSignSecret: z.string().optional(),
+  dingtalkVerificationToken: z.string().optional(),
+  dingtalkEventPort: z.number().int(),
+  dingtalkEventPath: z.string(),
+  dingtalkEnabled: z.boolean(),
+  emailEnabled: z.boolean(),
+  emailImapHost: z.string().optional(),
+  emailImapPort: z.number().int(),
+  emailImapSecure: z.boolean(),
+  emailImapUser: z.string().optional(),
+  emailImapPassword: z.string().optional(),
+  emailImapMailbox: z.string(),
+  emailPollIntervalSeconds: z.number().int(),
+  emailSmtpHost: z.string().optional(),
+  emailSmtpPort: z.number().int(),
+  emailSmtpSecure: z.boolean(),
+  emailSmtpUser: z.string().optional(),
+  emailSmtpPassword: z.string().optional(),
+  emailFromAddress: z.string().optional(),
+  emailSubjectPrefix: z.string(),
+  emailAutoReplyEnabled: z.boolean(),
+  mochatEnabled: z.boolean(),
+  mochatBaseUrl: z.string(),
+  mochatClawToken: z.string().optional(),
+  mochatSessions: z.array(z.string()),
+  mochatPollIntervalMs: z.number().int(),
+  mochatWatchTimeoutMs: z.number().int(),
+  mochatWatchLimit: z.number().int(),
+  qqEnabled: z.boolean(),
+  qqApiBaseUrl: z.string(),
+  qqAccessToken: z.string().optional(),
+  qqWebhookPort: z.number().int(),
+  qqWebhookPath: z.string(),
+  channelAccessPolicy: z.object({
+    telegram: AccessPolicySchema,
+    whatsapp: AccessPolicySchema,
+    slack: AccessPolicySchema,
+    feishu: AccessPolicySchema,
+    discord: AccessPolicySchema,
+    dingtalk: AccessPolicySchema,
+    email: AccessPolicySchema,
+    mochat: AccessPolicySchema,
+    qq: AccessPolicySchema,
+  }),
+  whatsappAuthDir: z.string(),
+  whatsappAccountId: z.string(),
+  whatsappAllowFrom: z.set(z.string()),
+  whatsappSelfChatMode: z.boolean(),
+  whatsappEnabled: z.boolean(),
+  dataDir: z.string(),
+  dbPath: z.string(),
+  logFile: z.string(),
+  allowlist: AllowlistSchema,
+  toolUpdatesEnabled: z.boolean(),
+  groupsEnabled: z.boolean(),
+  permissionMode: z.enum(['allow', 'deny']),
+  toolOutputLimit: z.number().int(),
+  healthPort: z.number().int().optional(),
+  logLevel: z.string(),
+});
+
+export { ChannelNameSchema };

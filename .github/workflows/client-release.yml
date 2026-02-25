@@ -1,0 +1,168 @@
+name: Client Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: Release version (for example 0.0.1-alpha.1)
+        required: true
+        type: string
+      ref:
+        description: Git ref to release from
+        required: false
+        default: main
+        type: string
+      prerelease:
+        description: Publish as prerelease
+        required: false
+        default: true
+        type: boolean
+
+permissions:
+  contents: write
+
+concurrency:
+  group: client-release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  release-client-macos:
+    name: Release Client (macOS)
+    runs-on: macos-14
+    timeout-minutes: 60
+    env:
+      CI: true
+      VERSION: ${{ inputs.version }}
+      TAG: v${{ inputs.version }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: ${{ inputs.ref }}
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10.24.0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+
+      - name: Setup Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Add Rust target (x86_64 macOS)
+        run: rustup target add x86_64-apple-darwin
+
+      - name: Setup Rust cache
+        uses: swatinem/rust-cache@v2
+        with:
+          workspaces: apps/client/src-tauri -> target
+
+      - name: Validate version format
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ ! "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$ ]]; then
+            echo "Invalid version: $VERSION"
+            echo "Expected format: 0.0.1 or 0.0.1-alpha.1"
+            exit 1
+          fi
+
+      - name: Ensure tag does not exist
+        shell: bash
+        run: |
+          set -euo pipefail
+          if git ls-remote --tags origin "refs/tags/${TAG}" | grep -q .; then
+            echo "Tag already exists: ${TAG}"
+            exit 1
+          fi
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build client daemon package
+        run: pnpm --filter @cofy-x/client-daemon build
+
+      - name: Create Tauri release override config
+        shell: bash
+        run: |
+          set -euo pipefail
+          config_path="$RUNNER_TEMP/tauri.release.override.json"
+          cat > "$config_path" <<EOF
+          {
+            "version": "${VERSION}",
+            "bundle": {
+              "externalBin": []
+            }
+          }
+          EOF
+          echo "TAURI_RELEASE_CONFIG=$config_path" >> "$GITHUB_ENV"
+
+      - name: Build DMG (unsigned)
+        run: pnpm --filter @cofy-x/deck-app tauri build --bundles dmg --ci --no-sign --config "$TAURI_RELEASE_CONFIG"
+
+      - name: Build DMG (unsigned, x86_64)
+        run: pnpm --filter @cofy-x/deck-app tauri build --bundles dmg --ci --no-sign --target x86_64-apple-darwin --config "$TAURI_RELEASE_CONFIG"
+
+      - name: Verify DMG artifact exists
+        shell: bash
+        run: |
+          set -euo pipefail
+          shopt -s nullglob
+          arm_dmgs=(apps/client/src-tauri/target/release/bundle/dmg/*.dmg)
+          amd_dmgs=(apps/client/src-tauri/target/x86_64-apple-darwin/release/bundle/dmg/*.dmg)
+          if [ "${#arm_dmgs[@]}" -eq 0 ]; then
+            echo "No arm64 DMG files found under apps/client/src-tauri/target/release/bundle/dmg/"
+            exit 1
+          fi
+          if [ "${#amd_dmgs[@]}" -eq 0 ]; then
+            echo "No x86_64 DMG files found under apps/client/src-tauri/target/x86_64-apple-darwin/release/bundle/dmg/"
+            exit 1
+          fi
+
+      - name: Upload DMG artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: deck-client-dmg-${{ inputs.version }}
+          path: |
+            apps/client/src-tauri/target/release/bundle/dmg/*.dmg
+            apps/client/src-tauri/target/x86_64-apple-darwin/release/bundle/dmg/*.dmg
+          retention-days: 14
+          if-no-files-found: error
+
+      - name: Create GitHub release and upload assets
+        id: publish_release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ env.TAG }}
+          target_commitish: ${{ inputs.ref }}
+          prerelease: ${{ inputs.prerelease }}
+          generate_release_notes: true
+          files: |
+            apps/client/src-tauri/target/release/bundle/dmg/*.dmg
+            apps/client/src-tauri/target/x86_64-apple-darwin/release/bundle/dmg/*.dmg
+
+      - name: Write release summary
+        shell: bash
+        run: |
+          set -euo pipefail
+          {
+            echo "## Client Release Summary"
+            echo ""
+            echo "- Version: \`${VERSION}\`"
+            echo "- Tag: \`${TAG}\`"
+            echo "- Ref: \`${{ inputs.ref }}\`"
+            echo "- Prerelease: \`${{ inputs.prerelease }}\`"
+            echo "- Release URL: ${{ steps.publish_release.outputs.url }}"
+            echo ""
+            echo "### DMG Assets"
+            ls -1 \
+              apps/client/src-tauri/target/release/bundle/dmg/*.dmg \
+              apps/client/src-tauri/target/x86_64-apple-darwin/release/bundle/dmg/*.dmg \
+              | sed 's/^/- /'
+          } >> "$GITHUB_STEP_SUMMARY"

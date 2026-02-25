@@ -1,0 +1,17 @@
+[project]
+name = "core-py"
+version = "0.1.0"
+description = "Core logic for deck"
+readme = "README.md"
+authors = [
+    { name = "jumu", email = "chenyingwei.cyw@antgroup.com" }
+]
+requires-python = ">=3.12"
+dependencies = []
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.uv]
+package = true

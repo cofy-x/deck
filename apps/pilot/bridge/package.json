@@ -1,0 +1,66 @@
+{
+  "name": "@cofy-x/deck-pilot-bridge",
+  "version": "0.0.1",
+  "description": "Messaging bridge for Deck (WhatsApp, Telegram, Slack)",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/cofy-x/deck.git",
+    "directory": "apps/pilot/bridge"
+  },
+  "keywords": [
+    "opencode",
+    "slack",
+    "telegram",
+    "whatsapp",
+    "bridge",
+    "bot"
+  ],
+  "bin": {
+    "pilot-bridge": "./dist/cli.js"
+  },
+  "type": "module",
+  "main": "dist/cli.js",
+  "scripts": {
+    "build:tsc": "tsc --build tsconfig.json",
+    "setup": "node scripts/setup.js",
+    "watch:tsc": "tsc --build --watch tsconfig.json --preserveWatchOutput",
+    "dev": "node --watch dist/cli.js",
+    "start": "node dist/cli.js start",
+    "build": "pnpm build:tsc && node ../../../scripts/build_package.js",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "whatsapp:login": "node dist/cli.js whatsapp login",
+    "test:smoke": "node scripts/smoke.js"
+  },
+  "files": [
+    "dist"
+  ],
+  "engines": {
+    "node": ">=20.0.0"
+  },
+  "dependencies": {
+    "@opencode-ai/sdk": "^1.2.6",
+    "@slack/socket-mode": "^2.0.5",
+    "@slack/web-api": "^7.13.0",
+    "@whiskeysockets/baileys": "7.0.0-rc.9",
+    "better-sqlite3": "^11.9.1",
+    "commander": "^12.1.0",
+    "discord.js": "^14.25.1",
+    "dotenv": "^16.4.7",
+    "grammy": "^1.39.3",
+    "imapflow": "^1.2.9",
+    "mailparser": "^3.9.3",
+    "nodemailer": "^8.0.1",
+    "pino": "^9.6.0",
+    "proxy-agent": "^6.5.0",
+    "qrcode-terminal": "^0.12.0",
+    "zod": "^4.3.5"
+  },
+  "devDependencies": {
+    "@types/better-sqlite3": "^7.6.13",
+    "@types/mailparser": "^3.4.6",
+    "@types/nodemailer": "^7.0.10",
+    "@types/qrcode-terminal": "^0.12.0",
+    "typescript": "^5.9.3"
+  }
+}

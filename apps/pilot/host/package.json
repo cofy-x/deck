@@ -1,0 +1,41 @@
+{
+  "name": "@cofy-x/deck-pilot-host",
+  "version": "0.0.1",
+  "description": "Headless CLI orchestrator for Deck Pilot (OpenCode + Server + Bot)",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/cofy-x/deck.git"
+  },
+  "type": "module",
+  "main": "dist/cli.js",
+  "bin": {
+    "pilot": "./dist/cli.js",
+    "pilot-host": "./dist/cli.js"
+  },
+  "scripts": {
+    "build:tsc": "tsc --build tsconfig.json",
+    "watch:tsc": "tsc --build --watch tsconfig.json --preserveWatchOutput",
+    "dev": "node --watch dist/cli.js",
+    "start": "node dist/cli.js",
+    "build": "pnpm build:tsc && node ../../../scripts/build_package.js",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run"
+  },
+  "files": [
+    "dist"
+  ],
+  "engines": {
+    "node": ">=20.0.0"
+  },
+  "opencodeVersion": "1.2.6",
+  "dependencies": {
+    "@cofy-x/deck-pilot-bridge": "workspace:*",
+    "@cofy-x/deck-pilot-server": "workspace:*",
+    "@opencode-ai/sdk": "^1.2.6",
+    "undici": "^7.21.0",
+    "zod": "^4.3.5"
+  },
+  "devDependencies": {
+    "typescript": "^5.9.3"
+  }
+}

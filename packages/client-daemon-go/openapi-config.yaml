@@ -1,0 +1,8 @@
+# packages/client-daemon-go/openapi-config.yaml
+moduleName: github.com/cofy-x/deck/packages/client-daemon-go/daemon
+gitUserId: cofy-x
+gitRepoId: deck/packages/client-daemon-go
+packageName: daemon
+withGoMod: false
+isGoSubmodule: true
+enumClassPrefix: false

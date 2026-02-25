@@ -1,0 +1,19 @@
+{
+  "name": "example-daemon",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Example daemon for the deck project",
+  "type": "module",
+  "scripts": {
+    "build": "tsc",
+    "test:connection": "tsx scripts/test-connection.ts",
+    "sandbox:info": "tsx scripts/sandbox-info.ts"
+  },
+  "dependencies": {
+    "@cofy-x/client-daemon": "workspace:*"
+  },
+  "devDependencies": {
+    "typescript": "^5.9.3",
+    "tsx": "^4.7.0"
+  }
+}

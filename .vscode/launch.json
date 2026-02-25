@@ -1,0 +1,150 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "Pilot Host (External OpenCode, dist)",
+      "type": "node",
+      "request": "launch",
+      "runtimeExecutable": "node",
+      "program": "${workspaceFolder}/apps/pilot/host/dist/cli.js",
+      "args": ["start"],
+      "cwd": "${workspaceFolder}/apps/pilot/host",
+      "envFile": "${workspaceFolder}/.vscode/pilot.local.env",
+      "console": "integratedTerminal",
+      "sourceMaps": true,
+      "preLaunchTask": "pilot:host:build",
+      "resolveSourceMapLocations": [
+        "${workspaceFolder}/**",
+        "!**/node_modules/**"
+      ]
+    },
+    {
+      "name": "Pilot Server (External OpenCode, dist)",
+      "type": "node",
+      "request": "launch",
+      "runtimeExecutable": "node",
+      "program": "${workspaceFolder}/apps/pilot/server/dist/cli.js",
+      "args": [
+        "--host",
+        "127.0.0.1",
+
+      ],
+      "cwd": "${workspaceFolder}",
+      "envFile": "${workspaceFolder}/.vscode/pilot.local.env",
+      "console": "integratedTerminal",
+      "sourceMaps": true,
+      "preLaunchTask": "pilot:server:build",
+      "resolveSourceMapLocations": [
+        "${workspaceFolder}/**",
+        "!**/node_modules/**"
+      ]
+    },
+    {
+      "name": "Pilot Bridge (External OpenCode, dist)",
+      "type": "node",
+      "request": "launch",
+      "runtimeExecutable": "node",
+      "program": "${workspaceFolder}/apps/pilot/bridge/dist/cli.js",
+      "args": ["start"],
+      "cwd": "${workspaceFolder}/apps/pilot/bridge",
+      "console": "integratedTerminal",
+      "sourceMaps": true,
+      "preLaunchTask": "pilot:bridge:build",
+      "resolveSourceMapLocations": [
+        "${workspaceFolder}/**",
+        "!**/node_modules/**"
+      ]
+    },
+    {
+      "name": "Pilot Host (External OpenCode, tsx)",
+      "type": "node",
+      "request": "launch",
+      "runtimeExecutable": "node",
+      "runtimeArgs": ["--import", "tsx"],
+      "program": "${workspaceFolder}/apps/pilot/host/src/cli.ts",
+      "args": ["start"],
+      "cwd": "${workspaceFolder}/apps/pilot/host",
+      "envFile": "${workspaceFolder}/.vscode/pilot.local.env",
+      "console": "integratedTerminal",
+      "skipFiles": ["<node_internals>/**"]
+    },
+    {
+      "name": "Pilot Server (External OpenCode, tsx)",
+      "type": "node",
+      "request": "launch",
+      "runtimeExecutable": "node",
+      "runtimeArgs": ["--import", "tsx"],
+      "program": "${workspaceFolder}/apps/pilot/server/src/cli.ts",
+      "args": [
+        "--host",
+        "127.0.0.1",
+      ],
+      "cwd": "${workspaceFolder}",
+      "envFile": "${workspaceFolder}/.vscode/pilot.local.env",
+      "console": "integratedTerminal",
+      "skipFiles": ["<node_internals>/**"]
+    },
+    {
+      "name": "Pilot Bridge (External OpenCode, tsx)",
+      "type": "node",
+      "request": "launch",
+      "runtimeExecutable": "node",
+      "runtimeArgs": ["--import", "tsx"],
+      "program": "${workspaceFolder}/apps/pilot/bridge/src/cli.ts",
+      "args": ["start"],
+      "cwd": "${workspaceFolder}/apps/pilot/bridge",
+      "console": "integratedTerminal",
+      "skipFiles": ["<node_internals>/**"]
+    },
+    {
+      "type": "node",
+      "request": "launch",
+      "name": "Debug Current TS File",
+      "runtimeExecutable": "node",
+      "runtimeArgs": ["--import", "tsx"],
+      "program": "${file}",
+      "skipFiles": ["<node_internals>/**"],
+      "cwd": "${workspaceFolder}",
+      "console": "integratedTerminal",
+      "env": {}
+    },
+    {
+      "type": "node",
+      "request": "launch",
+      "name": "Debug Test File",
+      "runtimeExecutable": "pnpm",
+      "runtimeArgs": [
+        "run",
+        "test",
+        "exec",
+        "vitest",
+        "run",
+        "${input:testFile}",
+        "--no-file-parallelism",
+        "--inspect-brk=9229"
+      ],
+      "cwd": "${workspaceFolder}",
+      "console": "integratedTerminal",
+      "internalConsoleOptions": "neverOpen",
+      "skipFiles": ["<node_internals>/**"]
+    }
+  ],
+  "compounds": [
+    {
+      "name": "Pilot Server + Bridge (dist)",
+      "configurations": [
+        "Pilot Server (External OpenCode, dist)",
+        "Pilot Bridge (External OpenCode, dist)"
+      ],
+      "stopAll": true
+    },
+    {
+      "name": "Pilot Server + Bridge (tsx)",
+      "configurations": [
+        "Pilot Server (External OpenCode, tsx)",
+        "Pilot Bridge (External OpenCode, tsx)"
+      ],
+      "stopAll": true
+    }
+  ]
+}

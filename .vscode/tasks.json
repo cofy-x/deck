@@ -1,0 +1,128 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "pilot:build",
+      "type": "shell",
+      "command": "pnpm",
+      "args": ["run", "pilot:build"],
+      "group": "build",
+      "problemMatcher": ["$tsc"],
+      "presentation": {
+        "echo": true,
+        "reveal": "silent",
+        "focus": false,
+        "panel": "shared"
+      }
+    },
+    {
+      "label": "pilot:host:build",
+      "type": "shell",
+      "command": "pnpm",
+      "args": ["--filter", "@cofy-x/deck-pilot-host", "run", "build:tsc"],
+      "group": "build",
+      "problemMatcher": ["$tsc"]
+    },
+    {
+      "label": "pilot:host:watch",
+      "type": "shell",
+      "command": "pnpm",
+      "args": ["--filter", "@cofy-x/deck-pilot-host", "run", "watch:tsc"],
+      "group": "build",
+      "isBackground": true,
+      "problemMatcher": ["$tsc-watch"],
+      "presentation": {
+        "echo": true,
+        "reveal": "silent",
+        "focus": false,
+        "panel": "dedicated"
+      }
+    },
+    {
+      "label": "pilot:server:build",
+      "type": "shell",
+      "command": "pnpm",
+      "args": ["--filter", "@cofy-x/deck-pilot-server", "run", "build:tsc"],
+      "group": "build",
+      "problemMatcher": ["$tsc"]
+    },
+    {
+      "label": "pilot:server:watch",
+      "type": "shell",
+      "command": "pnpm",
+      "args": ["--filter", "@cofy-x/deck-pilot-server", "run", "watch:tsc"],
+      "group": "build",
+      "isBackground": true,
+      "problemMatcher": ["$tsc-watch"],
+      "presentation": {
+        "echo": true,
+        "reveal": "silent",
+        "focus": false,
+        "panel": "dedicated"
+      }
+    },
+    {
+      "label": "pilot:bridge:build",
+      "type": "shell",
+      "command": "pnpm",
+      "args": ["--filter", "@cofy-x/deck-pilot-bridge", "run", "build:tsc"],
+      "group": "build",
+      "problemMatcher": ["$tsc"]
+    },
+    {
+      "label": "pilot:bridge:watch",
+      "type": "shell",
+      "command": "pnpm",
+      "args": ["--filter", "@cofy-x/deck-pilot-bridge", "run", "watch:tsc"],
+      "group": "build",
+      "isBackground": true,
+      "problemMatcher": ["$tsc-watch"],
+      "presentation": {
+        "echo": true,
+        "reveal": "silent",
+        "focus": false,
+        "panel": "dedicated"
+      }
+    },
+    {
+      "label": "pilot:test:host",
+      "type": "shell",
+      "command": "pnpm",
+      "args": ["--filter", "@cofy-x/deck-pilot-host", "run", "test"],
+      "group": "test",
+      "problemMatcher": []
+    },
+    {
+      "label": "pilot:test:server",
+      "type": "shell",
+      "command": "pnpm",
+      "args": ["--filter", "@cofy-x/deck-pilot-server", "run", "test"],
+      "group": "test",
+      "problemMatcher": []
+    },
+    {
+      "label": "pilot:test:bridge",
+      "type": "shell",
+      "command": "pnpm",
+      "args": ["--filter", "@cofy-x/deck-pilot-bridge", "run", "test"],
+      "group": "test",
+      "problemMatcher": []
+    },
+    {
+      "label": "pilot:test:all",
+      "dependsOrder": "sequence",
+      "dependsOn": ["pilot:test:host", "pilot:test:server", "pilot:test:bridge"],
+      "problemMatcher": []
+    },
+    {
+      "label": "Run current file",
+      "type": "shell",
+      "command": "pnpm",
+      "options": {
+        "cwd": "${workspaceFolder}"
+      },
+      "args": ["exec", "tsx", "${file}"],
+      "problemMatcher": []
+    }
+  ]
+}

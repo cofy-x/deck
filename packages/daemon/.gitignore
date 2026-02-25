@@ -1,0 +1,3 @@
+!pkg/terminal/static/
+!pkg/terminal/static/index.html
+pkg/terminal/static/xterm*

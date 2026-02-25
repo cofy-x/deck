@@ -1,0 +1,98 @@
+name: Client Build
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: client-build-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-client-macos:
+    name: Build Client (macOS)
+    runs-on: macos-14
+    timeout-minutes: 45
+    env:
+      CI: true
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10.24.0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+
+      - name: Setup Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Setup Rust cache
+        uses: swatinem/rust-cache@v2
+        with:
+          workspaces: apps/client/src-tauri -> target
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build client daemon package
+        run: pnpm --filter @cofy-x/client-daemon build
+
+      - name: Prepare CI sidecar stubs
+        shell: bash
+        run: |
+          set -euo pipefail
+          sidecar_dir="$RUNNER_TEMP/deck-client-sidecars"
+          mkdir -p "$sidecar_dir"
+
+          for bin in opencode pilot-server pilot-bridge pilot-host; do
+            cat > "$sidecar_dir/$bin" <<'EOF'
+          #!/usr/bin/env bash
+          echo "CI sidecar stub: build validation only."
+          exit 1
+          EOF
+            chmod +x "$sidecar_dir/$bin"
+          done
+
+          {
+            echo "OPENCODE_BIN_PATH=$sidecar_dir/opencode"
+            echo "PILOT_SERVER_BIN_PATH=$sidecar_dir/pilot-server"
+            echo "PILOT_BRIDGE_BIN_PATH=$sidecar_dir/pilot-bridge"
+            echo "PILOT_HOST_BIN_PATH=$sidecar_dir/pilot-host"
+          } >> "$GITHUB_ENV"
+
+      - name: Build client desktop app
+        run: pnpm --filter @cofy-x/deck-app tauri build --no-bundle --ci
+
+      - name: Verify build output
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -f apps/client/src-tauri/target/release/Deck
+
+      - name: Package build artifact
+        shell: bash
+        run: |
+          set -euo pipefail
+          artifact_dir="$RUNNER_TEMP/deck-client-artifact"
+          rm -rf "$artifact_dir"
+          mkdir -p "$artifact_dir"
+          cp apps/client/src-tauri/target/release/Deck "$artifact_dir/"
+          cp apps/client/src-tauri/tauri.conf.json "$artifact_dir/"
+          echo "ARTIFACT_DIR=$artifact_dir" >> "$GITHUB_ENV"
+
+      - name: Upload build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: deck-client-macos-${{ github.sha }}
+          path: ${{ env.ARTIFACT_DIR }}
+          retention-days: 7
+          if-no-files-found: error

@@ -1,0 +1,37 @@
+services:
+  deck-desktop:
+    # Forces the architecture to amd64
+    platform: linux/amd64
+    image: deck/desktop-runtime-base:24.04-aliyun-amd64
+    container_name: deck-desktop-instance
+
+    # Critical for GUI application stability
+    shm_size: '2gb'
+
+    ports:
+      - '16080:6080' # NoVNC Web
+      - '15901:5901' # VNC Direct
+
+    environment:
+      - VNC_RESOLUTION=1280x720
+      - VNC_USER=deck
+      - VNC_PORT=5901
+      - NO_VNC_PORT=6080
+      - DBUS_SESSION_BUS_ADDRESS=unix:path=/var/run/dbus/user_bus_socket
+
+    volumes:
+      # Persistent storage for the deck user
+      - ./data/home:/home/deck/Downloads
+
+    # Unconfined security for X11/automation tools
+    security_opt:
+      - seccomp:unconfined
+
+    deploy:
+      resources:
+        limits:
+          memory: 4G
+
+    restart: unless-stopped
+    stdin_open: true
+    tty: true

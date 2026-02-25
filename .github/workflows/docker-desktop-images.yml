@@ -1,0 +1,113 @@
+name: Docker Desktop Images
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  packages: write
+
+env:
+  REGISTRY: ghcr.io
+  OWNER: ${{ github.repository_owner }}
+  IMAGE_NS: ghcr.io/${{ github.repository_owner }}/deck
+  SHA_TAG: sha-${{ github.sha }}
+
+jobs:
+  build-and-push:
+    name: Build and Push Desktop Images (amd64)
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: go.work
+
+      - name: Login to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build computer-use plugin image (local build stage)
+        shell: bash
+        run: |
+          set -euo pipefail
+          docker build \
+            --platform linux/amd64 \
+            -t deck-computer-use-amd64:build \
+            -f docker/plugins/computer-use/Dockerfile \
+            .
+
+      - name: Build Linux binaries for sandbox image
+        shell: bash
+        run: |
+          set -euo pipefail
+          make build-daemon-linux
+          make build-cli-linux
+
+      - name: Build desktop image chain
+        shell: bash
+        run: |
+          set -euo pipefail
+          (cd docker/desktop/runtime-base && bash build.sh aliyun amd64)
+          (cd docker/desktop/runtime-dev && bash build.sh)
+          (cd docker/desktop/runtime-ai && bash build.sh)
+          bash docker/desktop/sandbox-ai/build.sh
+
+      - name: Tag and push images to GHCR
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          tag_and_push() {
+            local source_image="$1"
+            local target_repo="$2"
+
+            docker tag "${source_image}" "${target_repo}:latest"
+            docker tag "${source_image}" "${target_repo}:${SHA_TAG}"
+
+            docker push "${target_repo}:latest"
+            docker push "${target_repo}:${SHA_TAG}"
+          }
+
+          tag_and_push "deck/desktop-runtime-base:24.04-aliyun-amd64" "${IMAGE_NS}/desktop-runtime-base"
+          tag_and_push "deck/desktop-runtime-dev:latest" "${IMAGE_NS}/desktop-runtime-dev"
+          tag_and_push "deck/desktop-runtime-ai:latest" "${IMAGE_NS}/desktop-runtime-ai"
+          tag_and_push "deck/desktop-sandbox-ai:latest" "${IMAGE_NS}/desktop-sandbox-ai"
+
+      - name: Image summary and job report
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          echo "Built image list:"
+          if command -v rg >/dev/null 2>&1; then
+            docker images --format '{{.Repository}}:{{.Tag}}' | rg '^deck/(desktop-runtime-base|desktop-runtime-dev|desktop-runtime-ai|desktop-sandbox-ai)|^ghcr\.io/.*/deck/'
+          else
+            docker images --format '{{.Repository}}:{{.Tag}}' | grep -E '^deck/(desktop-runtime-base|desktop-runtime-dev|desktop-runtime-ai|desktop-sandbox-ai)|^ghcr\.io/.*/deck/'
+          fi
+
+          {
+            echo "## Desktop Image Publish Summary"
+            echo ""
+            echo "- Registry: \`${REGISTRY}\`"
+            echo "- Namespace: \`${IMAGE_NS}\`"
+            echo "- Commit: \`${GITHUB_SHA}\`"
+            echo "- SHA Tag: \`${SHA_TAG}\`"
+            echo ""
+            echo "### Published Images"
+            echo "- \`${IMAGE_NS}/desktop-runtime-base:latest\`"
+            echo "- \`${IMAGE_NS}/desktop-runtime-base:${SHA_TAG}\`"
+            echo "- \`${IMAGE_NS}/desktop-runtime-dev:latest\`"
+            echo "- \`${IMAGE_NS}/desktop-runtime-dev:${SHA_TAG}\`"
+            echo "- \`${IMAGE_NS}/desktop-runtime-ai:latest\`"
+            echo "- \`${IMAGE_NS}/desktop-runtime-ai:${SHA_TAG}\`"
+            echo "- \`${IMAGE_NS}/desktop-sandbox-ai:latest\`"
+            echo "- \`${IMAGE_NS}/desktop-sandbox-ai:${SHA_TAG}\`"
+          } >> "${GITHUB_STEP_SUMMARY}"

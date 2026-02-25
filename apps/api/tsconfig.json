@@ -1,0 +1,40 @@
+{
+  "extends": "../../tsconfig.json",
+  "compilerOptions": {
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
+    "target": "ES2022",
+    "lib": ["ES2023"],
+    "baseUrl": "./",
+    "outDir": "./dist",
+    "rootDir": "src",
+
+    // === NestJS required configuration ===
+    "emitDecoratorMetadata": true,
+    "experimentalDecorators": true,
+    "allowSyntheticDefaultImports": true,
+
+    // === Type safety configuration (Production Ready) ===
+    "strict": true,
+    "noImplicitAny": true,
+    "strictNullChecks": true,
+
+    // === NestJS only exception ===
+    // Allow properties to be uninitialized (because they are injected by the DI container at runtime)
+    "strictPropertyInitialization": false,
+
+    // === Build configuration ===
+    "composite": true,
+    "incremental": true,
+    "declaration": true,
+    "sourceMap": true,
+    "removeComments": true,
+    "skipLibCheck": true,
+    "noEmit": false,
+
+    "types": ["node", "vitest/globals"]
+  },
+  "include": ["src/**/*.ts", "src/**/*.json"],
+  "exclude": ["node_modules", "dist"],
+  "references": [{ "path": "../../packages/core-ts" }]
+}

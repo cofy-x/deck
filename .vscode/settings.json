@@ -1,0 +1,10 @@
+{
+  "files.associations": {
+    "*.css": "tailwindcss" // associate CSS files with Tailwind CSS
+  },
+  "editor.quickSuggestions": {
+    "strings": true //  autocomplete className in strings
+  },
+  "rust-analyzer.linkedProjects": ["apps/client/src-tauri/Cargo.toml"],
+  "bun.test.enable": false
+}

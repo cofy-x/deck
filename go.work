@@ -1,0 +1,9 @@
+go 1.25.5
+
+use (
+	./apps/cli
+	./packages/client-daemon-go
+	./packages/computer-use
+	./packages/core-go
+	./packages/daemon
+)

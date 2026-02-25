@@ -1,0 +1,70 @@
+# --- General / Environment ---
+.env
+.env*
+!.env.example
+*.log
+.tmp/
+.docker/
+bin/
+
+# --- OS Metadata ---
+.DS_Store
+Thumbs.db
+Desktop.ini
+
+# --- Editors / IDEs ---
+.idea/
+*.iml
+*.sublime-project
+*.sublime-workspace
+.vscode/pilot.local.env
+
+# --- Node.js / TypeScript (pnpm) ---
+node_modules/
+dist/
+build/
+out/
+.pnpm-debug.log*
+pnpm-debug.log*
+*.tsbuildinfo
+
+packages/*/src/generated/
+apps/*/src/generated/
+
+coverage/
+*.lcov
+
+# --- Rust (Cargo & Tauri) ---
+target/
+**/*.rs.bk
+apps/client/src-tauri/target/
+apps/client/src-tauri/gen/
+
+# --- Go ---
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+*.test
+*.prof
+
+# --- Python (uv) ---
+.venv/
+__pycache__/
+*.py[cod]
+*$py.class
+.ruff_cache/
+.mypy_cache/
+.pytest_cache/
+.ipynb_checkpoints/
+
+# --- Documentation & Design ---
+apps/dashboard/openapi*.json
+junit.xml
+
+# --- Project Specific ---
+bundle/
+patch_output.log
+
+reference

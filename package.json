@@ -1,0 +1,86 @@
+{
+  "name": "@cofy-x/deck",
+  "version": "0.0.1",
+  "description": "Local-first infrastructure for autonomous AI agents — secure sandboxes, one desktop app",
+  "keywords": [
+    "ai",
+    "agent",
+    "sandbox",
+    "tauri",
+    "desktop",
+    "local-first",
+    "autonomous",
+    "opencode",
+    "docker"
+  ],
+  "homepage": "https://github.com/cofy-x/deck#readme",
+  "engines": {
+    "node": ">=20.0.0"
+  },
+  "type": "module",
+  "workspaces": [
+    "apps/api",
+    "apps/dashboard",
+    "packages/core-ts",
+    "packages/client-daemon-ts",
+    "examples/daemon",
+    "apps/client",
+    "apps/pilot/bridge",
+    "apps/pilot/server",
+    "apps/pilot/host"
+  ],
+  "private": "true",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/cofy-x/deck.git"
+  },
+  "scripts": {
+    "build": "node scripts/build.js",
+    "gen:client": "node scripts/generate_client.js",
+    "docs:check": "node scripts/check_docs_entry.mjs",
+    "lint": "eslint . --ext .ts,.tsx",
+    "lint:fix": "eslint . --fix",
+    "lint:fix:format": "pnpm run lint:fix && pnpm run format",
+    "test": "pnpm -r run test",
+    "format": "prettier --experimental-cli --write .",
+    "gen:api": "pnpm --filter @cofy-x/deck-dashboard run api:gen",
+    "pilot:setup": "pnpm install && cp -n apps/pilot/bridge/.env.example apps/pilot/bridge/.env 2>/dev/null || true && pnpm run pilot:build",
+    "pilot:build": "pnpm --filter @cofy-x/deck-pilot-server --filter @cofy-x/deck-pilot-bridge --filter @cofy-x/deck-pilot-host run build:tsc && pnpm install",
+    "pilot:dev": "pnpm run pilot:build && pnpm --filter @cofy-x/deck-pilot-host run dev",
+    "pilot:link": "pnpm run pilot:build && pnpm --filter @cofy-x/deck-pilot-server --filter @cofy-x/deck-pilot-bridge --filter @cofy-x/deck-pilot-host link --global",
+    "pilot:unlink": "pnpm --filter @cofy-x/deck-pilot-server --filter @cofy-x/deck-pilot-bridge --filter @cofy-x/deck-pilot-host unlink --global"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.39.1",
+    "@openapitools/openapi-generator-cli": "^2.28.2",
+    "@types/node": "^24.10.3",
+    "@types/yargs": "^17.0.34",
+    "@vitest/coverage-v8": "^3.1.1",
+    "@vitest/eslint-plugin": "^1.4.0",
+    "cross-env": "^10.1.0",
+    "dotenv": "^17.2.3",
+    "esbuild-plugin-wasm": "^1.1.0",
+    "eslint": "^9.39.0",
+    "eslint-config-prettier": "^10.1.8",
+    "eslint-plugin-headers": "^1.3.3",
+    "eslint-plugin-import": "^2.32.0",
+    "eslint-plugin-react": "^7.37.5",
+    "eslint-plugin-react-hooks": "^5.2.0",
+    "glob": "^11.0.3",
+    "globals": "^16.5.0",
+    "prettier": "^3.7.3",
+    "read-package-up": "^11.0.0",
+    "strip-json-comments": "^5.0.3",
+    "tsx": "^4.21.0",
+    "typescript": "^5.9.3",
+    "typescript-eslint": "^8.46.2",
+    "vitest": "^3.2.4",
+    "yargs": "^18.0.0"
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "better-sqlite3"
+    ]
+  },
+  "packageManager": "pnpm@10.24.0"
+}

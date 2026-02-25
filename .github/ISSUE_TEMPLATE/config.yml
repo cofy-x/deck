@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Security Vulnerability Disclosure
+    url: https://github.com/cofy-x/deck/security/advisories/new
+    about: Report vulnerabilities privately through GitHub Security Advisories.
+  - name: Usage and Setup Guidance
+    url: https://github.com/cofy-x/deck/blob/main/SUPPORT.md
+    about: Read support channels before opening a new issue.

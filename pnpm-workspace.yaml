@@ -1,0 +1,22 @@
+packages:
+  - apps/api
+  - apps/dashboard
+  - apps/client
+  - packages/core-ts
+  - packages/client-daemon-ts
+  - apps/pilot/bridge
+  - apps/pilot/server
+  - apps/pilot/host
+  - examples/daemon
+
+ignoredBuiltDependencies:
+  - '@nestjs/core'
+  - '@scarf/scarf'
+  - '@whiskeysockets/baileys'
+  - esbuild
+  - msgpackr-extract
+  - protobufjs
+  - sharp
+
+onlyBuiltDependencies:
+  - better-sqlite3

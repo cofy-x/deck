@@ -1,0 +1,7 @@
+interface:
+  display_name: "Deck CLI"
+  short_description: "Use deck CLI with correct syntax and output parsing"
+  default_prompt: "Use $deck-cli to run safe and accurate deck CLI workflows in the sandbox."
+
+policy:
+  allow_implicit_invocation: true

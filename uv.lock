@@ -1,0 +1,31 @@
+version = 1
+revision = 1
+requires-python = ">=3.12"
+
+[manifest]
+members = [
+    "core-py",
+    "server-py",
+    "deck",
+]
+
+[[package]]
+name = "core-py"
+version = "0.1.0"
+source = { editable = "packages/core-py" }
+
+[[package]]
+name = "server-py"
+version = "0.1.0"
+source = { virtual = "apps/server-py" }
+dependencies = [
+    { name = "core-py" },
+]
+
+[package.metadata]
+requires-dist = [{ name = "core-py", editable = "packages/core-py" }]
+
+[[package]]
+name = "deck"
+version = "0.1.0"
+source = { virtual = "." }
