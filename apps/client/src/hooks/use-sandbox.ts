@@ -8,7 +8,12 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { invoke } from '@tauri-apps/api/core';
 
 import { useActiveConnection } from '@/hooks/use-connection';
+import { CONFIG_KEYS } from '@/hooks/use-config';
 import { createClient, unwrap, waitForHealthy } from '@/lib/opencode';
+import {
+  listCredentials,
+  listCustomProviders,
+} from '@/lib/credential-store';
 import { useProjectStore } from '@/stores/project-store';
 import {
   useSandboxStore,
@@ -58,46 +63,35 @@ export const SANDBOX_KEYS = {
 // Internal helpers
 // ---------------------------------------------------------------------------
 
-async function verifyRemoteConnection(input: {
+interface ServerConnectionInput {
   baseUrl: string;
   username?: string;
   password?: string;
-}) {
-  const client = createClient({
+}
+
+function buildClient(input: ServerConnectionInput) {
+  return createClient({
     baseUrl: input.baseUrl,
     auth:
       input.username && input.password
-        ? {
-            username: input.username,
-            password: input.password,
-          }
+        ? { username: input.username, password: input.password }
         : undefined,
-  });
-
-  await waitForHealthy(client, {
-    timeoutMs: 10_000,
-    pollMs: 500,
   });
 }
 
-async function fetchDefaultProjectDirectory(input: {
-  baseUrl: string;
-  username?: string;
-  password?: string;
-  healthTimeoutMs?: number;
-  healthPollMs?: number;
-}): Promise<string | null> {
+async function verifyRemoteConnection(input: ServerConnectionInput) {
+  const client = buildClient(input);
+  await waitForHealthy(client, { timeoutMs: 10_000, pollMs: 500 });
+}
+
+async function fetchDefaultProjectDirectory(
+  input: ServerConnectionInput & {
+    healthTimeoutMs?: number;
+    healthPollMs?: number;
+  },
+): Promise<string | null> {
   try {
-    const client = createClient({
-      baseUrl: input.baseUrl,
-      auth:
-        input.username && input.password
-          ? {
-              username: input.username,
-              password: input.password,
-            }
-        : undefined,
-    });
+    const client = buildClient(input);
     await waitForHealthy(client, {
       timeoutMs: input.healthTimeoutMs ?? 15_000,
       pollMs: input.healthPollMs ?? 500,
@@ -131,6 +125,66 @@ function clearProjectDirectory() {
   const project = useProjectStore.getState();
   if (project.currentDirectory) {
     project.setDirectory(null);
+  }
+}
+
+/**
+ * Restore provider credentials and custom provider configs from the local
+ * SQLite store into a freshly started OpenCode server instance.
+ */
+async function restoreProviderCredentials(
+  input: ServerConnectionInput & { profileId: string },
+): Promise<boolean> {
+  try {
+    const [credentials, customProviders] = await Promise.all([
+      listCredentials(input.profileId),
+      listCustomProviders(input.profileId),
+    ]);
+
+    if (credentials.length === 0 && customProviders.length === 0) {
+      return false;
+    }
+
+    const client = buildClient(input);
+
+    // Restore custom provider configurations to the global config so they survive dispose()
+    for (const cp of customProviders) {
+      try {
+        const providerConfig = JSON.parse(cp.providerConfig);
+        await client.global.config.update({
+          config: { provider: { [cp.providerId]: providerConfig } },
+        });
+      } catch (err) {
+        console.warn(
+          `[restoreProviderCredentials] Failed to restore custom provider "${cp.providerId}":`,
+          err,
+        );
+      }
+    }
+
+    // Restore auth credentials
+    for (const cred of credentials) {
+      try {
+        const auth = JSON.parse(cred.authData);
+        await client.auth.set({ providerID: cred.providerId, auth });
+      } catch (err) {
+        console.warn(
+          `[restoreProviderCredentials] Failed to restore credential for "${cred.providerId}":`,
+          err,
+        );
+      }
+    }
+
+    // Single dispose to reinitialise with all restored state
+    await client.global.dispose();
+
+    console.info(
+      `[restoreProviderCredentials] Restored ${credentials.length} credential(s) and ${customProviders.length} custom provider(s).`,
+    );
+    return true;
+  } catch (err) {
+    console.error('[restoreProviderCredentials] Restore failed:', err);
+    return false;
   }
 }
 
@@ -315,7 +369,8 @@ export function useDisconnectRemote() {
  */
 export function useStartSandbox() {
   const qc = useQueryClient();
-  const { scope, isRemote, endpoints, secrets } = useActiveConnection();
+  const { profile, scope, isRemote, endpoints, secrets } =
+    useActiveConnection();
 
   return useMutation({
     onMutate: async () => {
@@ -354,9 +409,18 @@ export function useStartSandbox() {
           healthTimeoutMs: 20_000,
           healthPollMs: 500,
         });
+
+        // Restore provider credentials from local SQLite into the fresh sandbox
+        await restoreProviderCredentials({
+          profileId: profile.id,
+          baseUrl: endpoints.opencodeBaseUrl,
+          username: secrets.opencodeUsername,
+          password: secrets.opencodePassword,
+        });
       }
       void qc.invalidateQueries({ queryKey: SANDBOX_KEYS.status(scope) });
       void qc.invalidateQueries({ queryKey: ['project', scope] });
+      void qc.invalidateQueries({ queryKey: CONFIG_KEYS.all(scope) });
     },
     onError: (error) => {
       useSandboxStore.getState().setMutating(false);

@@ -22,6 +22,7 @@ import { useSetAuth, useProviderAuthMethods } from '@/hooks/use-config';
 import { useOpenCodeClient } from '@/hooks/use-opencode-client';
 import { unwrap } from '@/lib/opencode';
 import { t } from '@/i18n';
+import { cn } from '@/lib/utils';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -159,6 +160,9 @@ export function ProviderAuthDialog({
                 onKeyDown={(e) => {
                   if (e.key === 'Enter') handleSaveApiKey();
                 }}
+                className={cn(
+                  apiKey ? 'text-foreground' : 'text-muted-foreground',
+                )}
               />
             </div>
           )}
