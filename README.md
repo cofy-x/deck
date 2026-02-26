@@ -117,14 +117,14 @@ graph LR
 
 ## Tech Stack
 
-| Layer | Technologies |
-| :--- | :--- |
-| Desktop App | Tauri v2, React, TypeScript, Vite, Tailwind CSS, shadcn/ui |
-| Sandbox Runtime | Go, Docker, noVNC, X11, supervisord |
-| AI Integration | OpenCode, SSE streaming, MCP tool server |
-| Backend Services | NestJS, Fastify, Drizzle ORM, PostgreSQL, Redis, BullMQ |
+| Layer            | Technologies                                                               |
+| :--------------- | :------------------------------------------------------------------------- |
+| Desktop App      | Tauri v2, React, TypeScript, Vite, Tailwind CSS, shadcn/ui                 |
+| Sandbox Runtime  | Go, Docker, noVNC, X11, supervisord                                        |
+| AI Integration   | OpenCode, SSE streaming, MCP tool server                                   |
+| Backend Services | NestJS, Fastify, Drizzle ORM, PostgreSQL, Redis, BullMQ                    |
 | Messaging Bridge | Node.js, WhatsApp / Telegram / Slack / Feishu / Discord / DingTalk / Email |
-| Build & Tooling | pnpm, Cargo, Go workspaces, uv, Makefile |
+| Build & Tooling  | pnpm, Cargo, Go workspaces, uv, Makefile                                   |
 
 ---
 
@@ -200,15 +200,7 @@ This project follows the [Contributor Covenant Code of Conduct](CODE_OF_CONDUCT.
 
 ## ⭐ Star History
 
-<p align="center">
-  <a href="https://star-history.com/#cofy-x/deck&Date">
-    <picture>
-      <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/svg?repos=cofy-x/deck&type=Date&theme=dark" />
-      <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/svg?repos=cofy-x/deck&type=Date" />
-      <img alt="Star History Chart" src="https://api.star-history.com/svg?repos=cofy-x/deck&type=Date" />
-    </picture>
-  </a>
-</p>
+[![Star History Chart](https://api.star-history.com/svg?repos=cofy-x/deck&type=Date&v=20260226)](https://star-history.com/#cofy-x/deck&Date)
 
 ---
 

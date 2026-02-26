@@ -52,6 +52,51 @@ run_capture() {
     echo "$code"
 }
 
+run_capture_with_timeout() {
+    local timeout_sec="$1"
+    local stdout_file="$2"
+    local stderr_file="$3"
+    shift 3
+
+    if ! [ "$timeout_sec" -gt 0 ] 2>/dev/null; then
+        timeout_sec=1
+    fi
+
+    "$@" >"$stdout_file" 2>"$stderr_file" &
+    local cmd_pid=$!
+    local start_ts
+    local now_ts
+    local elapsed
+    local timed_out=0
+    start_ts="$(date +%s)"
+
+    while kill -0 "$cmd_pid" >/dev/null 2>&1; do
+        now_ts="$(date +%s)"
+        elapsed=$((now_ts - start_ts))
+        if [ "$elapsed" -ge "$timeout_sec" ]; then
+            timed_out=1
+            kill "$cmd_pid" >/dev/null 2>&1 || true
+            sleep 1
+            if kill -0 "$cmd_pid" >/dev/null 2>&1; then
+                kill -9 "$cmd_pid" >/dev/null 2>&1 || true
+            fi
+            break
+        fi
+        sleep 1
+    done
+
+    set +e
+    wait "$cmd_pid" >/dev/null 2>&1
+    local code=$?
+    set -e
+
+    if [ "$timed_out" -eq 1 ]; then
+        code=124
+    fi
+
+    echo "$code"
+}
+
 json_payload_from_file() {
     local file="$1"
     local payload
