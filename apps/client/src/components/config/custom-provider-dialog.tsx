@@ -21,6 +21,7 @@ import {
 } from '@/components/ui/dialog';
 import { useAddCustomProvider } from '@/hooks/use-config';
 import { t } from '@/i18n';
+import { cn } from '@/lib/utils';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -197,6 +198,13 @@ export function CustomProviderDialog({
                 id="provider-id"
                 placeholder={t('custom_provider.placeholder_id')}
                 value={providerId}
+                className={cn(
+                  providerId ? 'text-foreground' : 'text-muted-foreground',
+                )}
+                autoComplete="off"
+                spellCheck={false}
+                autoCapitalize="none"
+                autoCorrect="off"
                 onChange={(e) => setProviderId(e.target.value)}
               />
               <p className="text-[11px] text-muted-foreground">
@@ -211,6 +219,9 @@ export function CustomProviderDialog({
                 id="display-name"
                 placeholder={t('custom_provider.placeholder_name')}
                 value={displayName}
+                className={cn(
+                  displayName ? 'text-foreground' : 'text-muted-foreground',
+                )}
                 onChange={(e) => setDisplayName(e.target.value)}
               />
             </div>
@@ -223,6 +234,9 @@ export function CustomProviderDialog({
                 placeholder={t('custom_provider.placeholder_url')}
                 value={baseURL}
                 onChange={(e) => setBaseURL(e.target.value)}
+                className={cn(
+                  baseURL ? 'text-foreground' : 'text-muted-foreground',
+                )}
               />
             </div>
 
@@ -235,6 +249,9 @@ export function CustomProviderDialog({
                 placeholder={t('custom_provider.api_key')}
                 value={apiKey}
                 onChange={(e) => setApiKey(e.target.value)}
+                className={cn(
+                  apiKey ? 'text-foreground' : 'text-muted-foreground',
+                )}
               />
               <p className="text-[11px] text-muted-foreground">
                 {t('custom_provider.api_key_hint')}
@@ -252,13 +269,19 @@ export function CustomProviderDialog({
                     placeholder="model-id"
                     value={model.id}
                     onChange={(e) => updateModel(index, 'id', e.target.value)}
-                    className="h-8 text-xs flex-1"
+                    className={cn(
+                      "h-8 text-xs flex-1",
+                      model.id ? 'text-foreground' : 'text-muted-foreground',
+                    )}
                   />
                   <Input
                     placeholder="Display Name"
                     value={model.name}
                     onChange={(e) => updateModel(index, 'name', e.target.value)}
-                    className="h-8 text-xs flex-1"
+                    className={cn(
+                      "h-8 text-xs flex-1",
+                      model.name ? 'text-foreground' : 'text-muted-foreground',
+                    )}
                   />
                   <Button
                     variant="ghost"
@@ -293,7 +316,10 @@ export function CustomProviderDialog({
                     placeholder="Header-Name"
                     value={header.key}
                     onChange={(e) => updateHeader(index, 'key', e.target.value)}
-                    className="h-8 text-xs flex-1"
+                    className={cn(
+                      "h-8 text-xs flex-1",
+                      header.key ? 'text-foreground' : 'text-muted-foreground',
+                    )}
                   />
                   <Input
                     placeholder="value"
@@ -301,7 +327,10 @@ export function CustomProviderDialog({
                     onChange={(e) =>
                       updateHeader(index, 'value', e.target.value)
                     }
-                    className="h-8 text-xs flex-1"
+                    className={cn(
+                      "h-8 text-xs flex-1",
+                      header.value ? 'text-foreground' : 'text-muted-foreground',
+                    )}
                   />
                   <Button
                     variant="ghost"

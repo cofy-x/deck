@@ -1,9 +1,16 @@
 mod api_log;
+mod credential_store;
 mod opencode_bridge;
 mod pilot_runtime;
 mod sandbox;
 mod sse_trace;
 
+use tauri::Manager;
+
+use credential_store::{
+    init_credential_store, list_credentials, list_custom_providers, remove_credential,
+    remove_custom_provider, save_credential, save_custom_provider,
+};
 use opencode_bridge::{
     start_bridge, stop_bridge, OpencodeBridgeManager, StartOpencodeWebBridgeInput,
     StopOpencodeWebBridgeInput,
@@ -123,6 +130,12 @@ pub fn run() {
         .plugin(tauri_plugin_http::init())
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_process::init())
+        .setup(|app| {
+            let store = init_credential_store(app)
+                .expect("failed to initialise credential store");
+            app.manage(store);
+            Ok(())
+        })
         .manage(OpencodeBridgeManager::default())
         .manage(PilotRuntimeManager::default())
         .invoke_handler(tauri::generate_handler![
@@ -139,6 +152,12 @@ pub fn run() {
             pilot_runtime_stop,
             pilot_runtime_status,
             pilot_runtime_health,
+            save_credential,
+            list_credentials,
+            remove_credential,
+            save_custom_provider,
+            list_custom_providers,
+            remove_custom_provider,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

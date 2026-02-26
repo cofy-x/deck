@@ -18,8 +18,13 @@ import type {
 import { toast } from 'sonner';
 
 import { unwrap } from '@/lib/opencode';
+import {
+  saveCredential,
+  removeCredential,
+  saveCustomProvider,
+} from '@/lib/credential-store';
 import { useOpenCodeClient } from '@/hooks/use-opencode-client';
-import { useConnectionScope } from '@/hooks/use-connection';
+import { useActiveConnection, useConnectionScope } from '@/hooks/use-connection';
 
 // ---------------------------------------------------------------------------
 // Query keys
@@ -262,6 +267,7 @@ export function useSetAuth() {
   const client = useOpenCodeClient();
   const qc = useQueryClient();
   const scope = useConnectionScope();
+  const { profile } = useActiveConnection();
 
   return useMutation({
     mutationFn: async (input: {
@@ -270,7 +276,7 @@ export function useSetAuth() {
       auth: Auth;
     }) => {
       if (!client) throw new Error('No client available');
-      // 1. Store credential
+      // 1. Store credential on the server
       const result = await client.auth.set({
         providerID: input.providerID,
         auth: input.auth,
@@ -287,6 +293,15 @@ export function useSetAuth() {
       toast.success(`${label} connected`, {
         description: `You can now use ${label} models.`,
       });
+      // 4. Persist credential to local SQLite for sandbox restart recovery
+      void saveCredential(
+        profile.id,
+        variables.providerID,
+        variables.auth.type,
+        JSON.stringify(variables.auth),
+      ).catch((err) =>
+        console.error('[useSetAuth] Failed to persist credential locally:', err),
+      );
     },
     onError: (error) => {
       console.error('[useSetAuth] Failed to set auth:', error);
@@ -304,6 +319,7 @@ export function useRemoveAuth() {
   const client = useOpenCodeClient();
   const qc = useQueryClient();
   const scope = useConnectionScope();
+  const { profile } = useActiveConnection();
 
   return useMutation({
     mutationFn: async (input: {
@@ -325,6 +341,13 @@ export function useRemoveAuth() {
       toast.success(`${label} disconnected`, {
         description: `${label} models are no longer available.`,
       });
+      // 4. Remove credential from local SQLite
+      void removeCredential(profile.id, variables.providerID).catch((err) =>
+        console.error(
+          '[useRemoveAuth] Failed to remove credential locally:',
+          err,
+        ),
+      );
     },
     onError: (error) => {
       console.error('[useRemoveAuth] Failed to remove auth:', error);
@@ -355,6 +378,7 @@ export function useAddCustomProvider() {
   const client = useOpenCodeClient();
   const qc = useQueryClient();
   const scope = useConnectionScope();
+  const { profile } = useActiveConnection();
 
   return useMutation({
     mutationFn: async (input: CustomProviderInput) => {
@@ -384,8 +408,8 @@ export function useAddCustomProvider() {
       }
       providerPatch.options = options as ProviderConfig['options'];
 
-      // Update config with new provider
-      const result = await client.config.update({
+      // Update global config so the provider survives dispose() reinitialisation
+      const result = await client.global.config.update({
         config: {
           provider: { [input.id.trim()]: providerPatch },
         } as Config,
@@ -402,6 +426,34 @@ export function useAddCustomProvider() {
 
       // Dispose so the server picks up the new provider + credential
       await client.global.dispose();
+
+      // Persist custom provider config + credential locally for restart recovery
+      const providerConfigJson = JSON.stringify(providerPatch);
+      void saveCustomProvider(
+        profile.id,
+        input.id.trim(),
+        input.name.trim(),
+        providerConfigJson,
+      ).catch((err) =>
+        console.error(
+          '[useAddCustomProvider] Failed to persist custom provider locally:',
+          err,
+        ),
+      );
+      if (input.apiKey?.trim()) {
+        const auth = { type: 'api' as const, key: input.apiKey.trim() };
+        void saveCredential(
+          profile.id,
+          input.id.trim(),
+          'api',
+          JSON.stringify(auth),
+        ).catch((err) =>
+          console.error(
+            '[useAddCustomProvider] Failed to persist credential locally:',
+            err,
+          ),
+        );
+      }
 
       return config;
     },
