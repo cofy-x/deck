@@ -4,7 +4,7 @@ This directory contains Bash integration tests for core scripts in:
 
 - `skills/deck-cli/scripts`
 
-The suite builds local artifacts, starts a dedicated desktop sandbox container with test-only ports, waits for `computer-use` readiness, then executes script-level assertions.
+The suite builds local artifacts, starts a dedicated desktop sandbox container with test-only ports, waits for `computer-use` readiness, validates mouse scroll no-hang regression checks (CLI + HTTP), then executes script-level assertions.
 
 ## Covered Scripts
 
@@ -14,6 +14,11 @@ The suite builds local artifacts, starts a dedicated desktop sandbox container w
 - `backup-files.sh`
 - `batch-replace.sh` (preview and execute)
 - `git-safe-commit.sh`
+
+## Additional Coverage
+
+- `deck computer mouse scroll` no-hang regression checks (`down` and `up`)
+- `POST /computeruse/mouse/scroll` no-hang regression checks (`down` and `up`)
 
 ## Test Ports
 
@@ -45,6 +50,7 @@ bash tests/integration/skills/deck-cli/run-suite.sh
 - `DECK_SKILL_TEST_IMAGE` (default: `deck/desktop-sandbox-ai:latest`)
 - `DECK_SKILL_TEST_SKIP_BUILD` (default: `0`)
 - `DECK_SKILL_TEST_TIMEOUT_SEC` (default: `180`)
+- `DECK_SKILL_TEST_SCROLL_TIMEOUT_SEC` (default: `8`)
 - `DECK_SKILL_TEST_START_RETRY_INTERVAL_SEC` (default: `10`)
 - `DECK_SKILL_TEST_ROOT` (default: `/tmp/deck-skill-it`)
 

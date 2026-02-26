@@ -200,15 +200,7 @@ deck/
 
 ## ⭐ Star 趋势
 
-<p align="center">
-  <a href="https://star-history.com/#cofy-x/deck&Date">
-    <picture>
-      <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/svg?repos=cofy-x/deck&type=Date&theme=dark" />
-      <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/svg?repos=cofy-x/deck&type=Date" />
-      <img alt="Star History Chart" src="https://api.star-history.com/svg?repos=cofy-x/deck&type=Date" />
-    </picture>
-  </a>
-</p>
+[![Star History Chart](https://api.star-history.com/svg?repos=cofy-x/deck&type=Date&v=20260226)](https://star-history.com/#cofy-x/deck&Date)
 
 ---
 

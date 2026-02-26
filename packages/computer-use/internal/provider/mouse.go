@@ -1,7 +1,9 @@
 package provider
 
 import (
+	"fmt"
 	"os"
+	"strings"
 	"time"
 
 	"github.com/cofy-x/deck/packages/computer-use/api"
@@ -132,23 +134,47 @@ func (u *ComputerUse) Drag(req *api.MouseDragRequest) (*api.MouseDragResponse, e
 }
 
 func (u *ComputerUse) Scroll(req *api.MouseScrollRequest) (*api.ScrollResponse, error) {
-	// Default amount if not specified
-	if req.Amount == 0 {
-		req.Amount = 3
+	scrollY, err := normalizeScrollDelta(req)
+	if err != nil {
+		return nil, err
 	}
 
 	// Move mouse to scroll position
 	robotgo.Move(req.X, req.Y)
 	time.Sleep(50 * time.Millisecond)
 
-	// Perform scroll
-	if req.Direction == "up" {
-		robotgo.ScrollSmooth(req.Amount, 0)
-	} else {
-		robotgo.ScrollSmooth(-req.Amount, 0)
-	}
+	// Use a single scroll event to avoid blocking behavior in ScrollSmooth with invalid loop counts.
+	robotgo.Scroll(0, scrollY)
 
 	return &api.ScrollResponse{
 		Success: true,
 	}, nil
+}
+
+func normalizeScrollDelta(req *api.MouseScrollRequest) (int, error) {
+	if req == nil {
+		return 0, fmt.Errorf("scroll request is required")
+	}
+
+	direction := strings.ToLower(strings.TrimSpace(req.Direction))
+	if direction == "" {
+		return 0, fmt.Errorf("scroll direction is required")
+	}
+
+	amount := req.Amount
+	if amount == 0 {
+		amount = 3
+	}
+	if amount < 0 {
+		amount = -amount
+	}
+
+	switch direction {
+	case "up":
+		return amount, nil
+	case "down":
+		return -amount, nil
+	default:
+		return 0, fmt.Errorf("invalid scroll direction %q, expected 'up' or 'down'", req.Direction)
+	}
 }

@@ -12,6 +12,7 @@ source "${SCRIPT_DIR}/lib/helpers.sh"
 : "${DECK_SKILL_TEST_IMAGE:=deck/desktop-sandbox-ai:latest}"
 : "${DECK_SKILL_TEST_SKIP_BUILD:=0}"
 : "${DECK_SKILL_TEST_TIMEOUT_SEC:=180}"
+: "${DECK_SKILL_TEST_SCROLL_TIMEOUT_SEC:=8}"
 : "${DECK_SKILL_TEST_ROOT:=/tmp/deck-skill-it}"
 
 : "${HOST_DAEMON_PORT:=13280}"
@@ -25,6 +26,7 @@ export DECK_SKILL_TEST_CONTAINER_NAME
 export DECK_SKILL_TEST_IMAGE
 export DECK_SKILL_TEST_SKIP_BUILD
 export DECK_SKILL_TEST_TIMEOUT_SEC
+export DECK_SKILL_TEST_SCROLL_TIMEOUT_SEC
 export DECK_SKILL_TEST_ROOT
 export HOST_DAEMON_PORT
 export HOST_OPENCODE_PORT
@@ -240,6 +242,73 @@ test_run_tests_failure() {
     return 0
 }
 
+test_mouse_scroll_cli_no_hang() {
+    local direction out err ec
+
+    for direction in down up; do
+        out="$(mktemp "${TMP_DIR}/mouse-scroll-cli-${direction}.out.XXXXXX")"
+        err="$(mktemp "${TMP_DIR}/mouse-scroll-cli-${direction}.err.XXXXXX")"
+
+        ec="$(run_capture_with_timeout "$DECK_SKILL_TEST_SCROLL_TIMEOUT_SEC" "$out" "$err" deck_cmd_json computer mouse scroll 640 360 "$direction")"
+        if [ "$ec" -eq 124 ]; then
+            print_failure_context "mouse-scroll cli timeout (${direction})" "$ec" "$out" "$err"
+            return 1
+        fi
+        if [ "$ec" -ne 0 ]; then
+            print_failure_context "mouse-scroll cli exit code (${direction})" "$ec" "$out" "$err"
+            return 1
+        fi
+        if ! assert_json_expr "$out" '.success == true'; then
+            print_failure_context "mouse-scroll cli success contract (${direction})" "$ec" "$out" "$err"
+            return 1
+        fi
+    done
+
+    return 0
+}
+
+test_mouse_scroll_http_no_hang() {
+    local direction body out err ec http_code
+
+    for direction in down up; do
+        body="$(mktemp "${TMP_DIR}/mouse-scroll-http-${direction}.body.XXXXXX")"
+        out="$(mktemp "${TMP_DIR}/mouse-scroll-http-${direction}.out.XXXXXX")"
+        err="$(mktemp "${TMP_DIR}/mouse-scroll-http-${direction}.err.XXXXXX")"
+
+        ec="$(run_capture "$out" "$err" curl --silent --show-error --max-time 5 --request POST --url "http://localhost:${HOST_DAEMON_PORT}/computeruse/mouse/scroll" --header "content-type: application/json" --output "$body" --write-out "%{http_code}" --data "{\"x\":640,\"y\":360,\"direction\":\"${direction}\",\"amount\":3}")"
+        if [ "$ec" -ne 0 ]; then
+            print_failure_context "mouse-scroll http curl exit code (${direction})" "$ec" "$out" "$err"
+            if [ -s "$body" ]; then
+                log_error "HTTP response body:"
+                sed -n '1,120p' "$body" >&2
+            fi
+            return 1
+        fi
+
+        http_code="$(cat "$out")"
+        if [ "$http_code" != "200" ]; then
+            log_error "mouse-scroll http expected 200, got ${http_code} (${direction})"
+            if [ -s "$body" ]; then
+                log_error "HTTP response body:"
+                sed -n '1,120p' "$body" >&2
+            fi
+            if [ -s "$err" ]; then
+                log_error "curl stderr:"
+                sed -n '1,120p' "$err" >&2
+            fi
+            return 1
+        fi
+
+        if ! assert_json_expr "$body" '.success == true'; then
+            log_error "mouse-scroll http success contract failed (${direction})"
+            sed -n '1,120p' "$body" >&2
+            return 1
+        fi
+    done
+
+    return 0
+}
+
 test_backup_files() {
     local out err ec backup_path
     out="$(mktemp "${TMP_DIR}/backup-files.out.XXXXXX")"
@@ -348,6 +417,9 @@ main() {
         log_error "Computer-use readiness gate failed"
         exit 1
     fi
+
+    run_case "mouse scroll cli no-hang regression" test_mouse_scroll_cli_no_hang
+    run_case "mouse scroll http no-hang regression" test_mouse_scroll_http_no_hang
 
     prepare_fixtures
 
