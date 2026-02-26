@@ -437,6 +437,26 @@ export const zh: Record<string, string> = {
   'time.days_ago': '{n} 天前',
 
   // ---------------------------------------------------------------------------
+  // Update check
+  // ---------------------------------------------------------------------------
+  'update.available_title': '发现新版本',
+  'update.available_description':
+    '新版本 v{version} 已发布，可前往下载。',
+  'update.download': '下载',
+  'update.dismiss': '忽略',
+  'update.check': '检查更新',
+  'update.checking': '检查中...',
+  'update.up_to_date': '当前已是最新版本。',
+  'update.check_failed': '检查更新失败。',
+  'update.current_version': '版本',
+  'update.new_version_badge': 'v{version} 可更新',
+
+  // ---------------------------------------------------------------------------
+  // About section (settings)
+  // ---------------------------------------------------------------------------
+  'config.about': '关于',
+
+  // ---------------------------------------------------------------------------
   // Connection store
   // ---------------------------------------------------------------------------
   'store.local_sandbox': '本地沙盒',

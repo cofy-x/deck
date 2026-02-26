@@ -18,6 +18,7 @@ import {
 } from '@/components/ui/tooltip';
 import { AgentSelector } from '@/components/config/agent-selector';
 import { useChatStore } from '@/stores/chat-store';
+import { useImeEnterGuard } from '@/hooks/use-ime-enter-guard';
 import {
   MentionPopover,
   useMentionItemCount,
@@ -222,6 +223,8 @@ export function ChatInput({
   }, [focusRequestId]);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const wrapperRef = useRef<HTMLDivElement>(null);
+  const { onCompositionStart, onCompositionEnd, shouldBlockKeyDown } =
+    useImeEnterGuard();
   const [pendingFiles, setPendingFiles] = useState<File[]>([]);
 
   // Popover state
@@ -406,8 +409,12 @@ export function ChatInput({
 
   const handleKeyDown = useCallback(
     (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+      const isComposing = shouldBlockKeyDown(e);
+
       // Handle popover keyboard navigation
       if (popoverMode !== 'none' && currentItemCount > 0) {
+        if (isComposing) return;
+
         switch (e.key) {
           case 'ArrowDown': {
             e.preventDefault();
@@ -439,6 +446,8 @@ export function ChatInput({
 
       // Default: Enter sends the message
       if (e.key === 'Enter' && !e.shiftKey) {
+        if (isComposing) return;
+
         if (canStop || isSending || isStopping) {
           e.preventDefault();
           return;
@@ -455,6 +464,7 @@ export function ChatInput({
       isStopping,
       handleSend,
       dispatchPopoverSelect,
+      shouldBlockKeyDown,
     ],
   );
 
@@ -549,6 +559,8 @@ export function ChatInput({
             value={inputText}
             onChange={handleInputChange}
             onKeyDown={handleKeyDown}
+            onCompositionStart={onCompositionStart}
+            onCompositionEnd={onCompositionEnd}
             placeholder={
               disabled
                 ? t('chat.placeholder_disabled')

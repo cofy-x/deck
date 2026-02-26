@@ -61,6 +61,7 @@ import {
 } from '@/hooks/use-sandbox';
 import { cn } from '@/lib/utils';
 import { t } from '@/i18n';
+import { useUpdateCheck } from '@/hooks/use-update-check';
 
 const SANDBOX_HOME_PREFIX = '/home/deck/';
 
@@ -103,6 +104,8 @@ export function CockpitLayout() {
   const { profile, isRemote, isLocal } = useActiveConnection();
   const { active: pathCopied, trigger: triggerPathCopied } =
     useTransientFlag(1200);
+
+  useUpdateCheck();
   const previousSwitchNonceRef = useRef<number>(switchNonce);
   const rightPanelRef = useRef<PanelImperativeHandle | null>(null);
 
