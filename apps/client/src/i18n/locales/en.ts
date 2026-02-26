@@ -456,6 +456,26 @@ export const en: Record<string, string> = {
   'time.days_ago': '{n}d ago',
 
   // ---------------------------------------------------------------------------
+  // Update check
+  // ---------------------------------------------------------------------------
+  'update.available_title': 'Update Available',
+  'update.available_description':
+    'New version v{version} is ready to download.',
+  'update.download': 'Download',
+  'update.dismiss': 'Dismiss',
+  'update.check': 'Check for updates',
+  'update.checking': 'Checking...',
+  'update.up_to_date': 'You are on the latest version.',
+  'update.check_failed': 'Failed to check for updates.',
+  'update.current_version': 'Version',
+  'update.new_version_badge': 'v{version} available',
+
+  // ---------------------------------------------------------------------------
+  // About section (settings)
+  // ---------------------------------------------------------------------------
+  'config.about': 'About',
+
+  // ---------------------------------------------------------------------------
   // Connection store
   // ---------------------------------------------------------------------------
   'store.local_sandbox': 'Local Sandbox',

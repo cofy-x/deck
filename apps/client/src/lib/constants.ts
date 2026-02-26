@@ -45,6 +45,8 @@ export const DEFAULT_IMAGE = 'deck/desktop-sandbox-ai:latest';
 
 export const LANGUAGE_PREF_KEY = 'deck.language';
 
+export const UPDATE_DISMISSED_KEY = 'deck.update.dismissed';
+
 // ---------------------------------------------------------------------------
 // Display configuration
 // ---------------------------------------------------------------------------

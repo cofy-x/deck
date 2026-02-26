@@ -40,6 +40,7 @@ import { useModelPreferencesStore } from '@/stores/model-preferences-store';
 import { useDebugStore } from '@/stores/debug-store';
 import { useConfig, useUpdateConfig, useProviders } from '@/hooks/use-config';
 import type { FlatModel } from '@/hooks/use-config';
+import { AboutSection } from '@/components/config/about-section';
 
 // ---------------------------------------------------------------------------
 // Section wrapper
@@ -454,6 +455,11 @@ export function SettingsSheet() {
                     />
                   </FieldRow>
                 </SettingsSection>
+
+                <Separator />
+
+                {/* --- About --- */}
+                <AboutSection />
               </>
             )}
           </div>
