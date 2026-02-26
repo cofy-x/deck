@@ -56,6 +56,7 @@ import { t } from '@/i18n';
 function useValidateStoredModel(models: FlatModel[]) {
   const recentModels = useModelPreferencesStore((s) => s.recent);
   const selectModel = useModelPreferencesStore((s) => s.selectModel);
+  const reset = useModelPreferencesStore((s) => s.reset);
 
   useEffect(() => {
     // Only validate after models have loaded
@@ -77,9 +78,16 @@ function useValidateStoredModel(models: FlatModel[]) {
           `[ModelSelector] Stored model "${activeKey}" no longer available. Falling back to "${fallback.key}".`,
         );
         selectModel(fallback.providerID, fallback.model.id);
+      } else {
+        // No connected providers at all — clear stale selection to avoid
+        // sending requests to an unauthenticated provider.
+        console.warn(
+          `[ModelSelector] No connected providers found. Clearing stale model selection.`,
+        );
+        reset();
       }
     }
-  }, [models, recentModels, selectModel]);
+  }, [models, recentModels, selectModel, reset]);
 }
 
 // ---------------------------------------------------------------------------

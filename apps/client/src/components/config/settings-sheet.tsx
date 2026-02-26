@@ -227,8 +227,16 @@ function ModelTogglesSection() {
         <Input
           placeholder={t('config.search_models')}
           value={search}
+          autoComplete="off"
+          spellCheck={false}
+          autoCapitalize="none"
+          autoCorrect="off"
           onChange={(e) => setSearch(e.target.value)}
-          className="h-7 pl-7 text-xs"
+          className={cn(
+            'h-7 pl-7 text-xs',
+            'placeholder:text-current',
+            search ? 'text-foreground' : 'text-muted-foreground',
+          )}
         />
       </div>
       <div className="max-h-[280px] overflow-y-auto rounded-md border p-1">
@@ -382,9 +390,15 @@ export function SettingsSheet() {
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="manual">{t('config.share_manual')}</SelectItem>
-                        <SelectItem value="auto">{t('config.share_auto')}</SelectItem>
-                        <SelectItem value="disabled">{t('config.share_disabled')}</SelectItem>
+                        <SelectItem value="manual">
+                          {t('config.share_manual')}
+                        </SelectItem>
+                        <SelectItem value="auto">
+                          {t('config.share_auto')}
+                        </SelectItem>
+                        <SelectItem value="disabled">
+                          {t('config.share_disabled')}
+                        </SelectItem>
                       </SelectContent>
                     </Select>
                   </FieldRow>

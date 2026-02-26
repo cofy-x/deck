@@ -194,7 +194,10 @@ export function ProjectPickerDialog() {
               value={search}
               onChange={(e) => handleSearchChange(e.target.value)}
               onKeyDown={handleKeyDown}
-              className="pl-8"
+              className={cn(
+                'pl-8',
+                search ? 'text-foreground' : 'text-muted-foreground',
+              )}
               autoFocus
               spellCheck={false}
               autoCorrect="off"

@@ -246,8 +246,16 @@ export function ProviderList({
             <Input
               placeholder={t('provider.search')}
               value={search}
+              autoComplete="off"
+              spellCheck={false}
+              autoCapitalize="none"
+              autoCorrect="off"
               onChange={(e) => setSearch(e.target.value)}
-              className="h-7 pl-7 text-xs"
+              className={cn(
+                'h-7 pl-7 text-xs',
+                'placeholder:text-current',
+                search ? 'text-foreground' : 'text-muted-foreground',
+              )}
             />
           </div>
           <Button
