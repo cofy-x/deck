@@ -41,10 +41,7 @@ function detectLocale(): Locale {
     return stored;
   }
 
-  const candidates = [window.navigator.language, ...window.navigator.languages];
-  return candidates.some((item) => item.toLowerCase().startsWith('zh'))
-    ? 'zh-CN'
-    : 'en';
+  return 'en';
 }
 
 function isExternalLink(href: string): boolean {

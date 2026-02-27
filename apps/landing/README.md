@@ -28,3 +28,4 @@ pnpm --filter @cofy-x/deck-landing run build
 - Compose file: `deploy/landing/docker-compose.yml`
 - Runbook: `docs/design/landing-deploy.md`
 - GitHub Actions image workflow: `.github/workflows/landing-image.yml`
+- GitHub Actions Pages workflow: `.github/workflows/landing-pages-deploy.yml`

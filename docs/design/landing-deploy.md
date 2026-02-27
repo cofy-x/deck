@@ -25,6 +25,29 @@ ghcr.io/<owner>/deck/landing:latest
 ghcr.io/<owner>/deck/landing:sha-<commit>
 ```
 
+## 0.1 Cloudflare Pages workflow
+
+Workflow file:
+
+```text
+.github/workflows/landing-pages-deploy.yml
+```
+
+Purpose:
+
+- Build `apps/landing` static assets.
+- Deploy `apps/landing/dist` to Cloudflare Pages.
+- Trigger automatically on `main` pushes affecting landing files, and manually via `workflow_dispatch`.
+
+Required GitHub repository secrets:
+
+- `CLOUDFLARE_API_TOKEN`: API token with Pages deployment permission.
+- `CLOUDFLARE_ACCOUNT_ID`: Cloudflare account ID.
+
+Optional GitHub repository variable:
+
+- `CLOUDFLARE_PAGES_PROJECT`: Pages project name. Defaults to `deck` when unset.
+
 ## 1. Build the landing image
 
 From repository root:
