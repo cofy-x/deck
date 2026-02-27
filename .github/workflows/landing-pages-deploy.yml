@@ -49,12 +49,13 @@ jobs:
           project="${CF_PAGES_PROJECT:-deck}"
           echo "project=${project}" >> "${GITHUB_OUTPUT}"
 
-      - name: Deploy via Wrangler
-        uses: cloudflare/wrangler-action@v3
-        with:
-          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          command: >-
-            pages deploy apps/landing/dist
-            --project-name=${{ steps.resolve_project.outputs.project }}
+      - name: Deploy via Wrangler CLI
+        shell: bash
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          set -euo pipefail
+          pnpm dlx wrangler@4.55.0 pages deploy apps/landing/dist \
+            --project-name="${{ steps.resolve_project.outputs.project }}" \
             --commit-dirty=true
