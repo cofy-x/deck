@@ -15,6 +15,7 @@ Status definitions:
 | `apps/cli` | `ACTIVE` | `go.work` | [apps/cli/README.md](../apps/cli/README.md) | MCP tool server. |
 | `apps/client` | `ACTIVE` | `pnpm` + `cargo` | [apps/client/README.md](../apps/client/README.md) | Desktop cockpit and Pilot runtime host surface. |
 | `apps/dashboard` | `ACTIVE` | `pnpm` | [apps/dashboard/README.md](../apps/dashboard/README.md) | Admin web frontend. |
+| `apps/landing` | `ACTIVE` | `pnpm` | [apps/landing/README.md](../apps/landing/README.md) | Marketing landing site for deck.cofy-x.space. |
 | `apps/pilot` | `ACTIVE` | `pnpm` (`bridge/server/host`) | [docs/design/pilot/README.md](../docs/design/pilot/README.md) | Suite root; use `apps/pilot/{bridge,host,server}` directly. |
 | `apps/server-go` | `PLACEHOLDER` | `none` | [apps/server-go/README.md](../apps/server-go/README.md) | Reserved directory, no runtime code yet. |
 | `apps/server-py` | `PLACEHOLDER` | `uv` | [apps/server-py/README.md](../apps/server-py/README.md) | Python placeholder service used for workspace bootstrap only. |

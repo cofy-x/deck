@@ -35,6 +35,7 @@
     { "path": "./packages/client-daemon-ts" },
     { "path": "./apps/api" },
     { "path": "./apps/dashboard" },
+    { "path": "./apps/landing" },
     { "path": "./apps/client" },
     { "path": "./apps/pilot/bridge" },
     { "path": "./apps/pilot/server" },

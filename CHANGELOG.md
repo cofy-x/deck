@@ -9,9 +9,32 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ### Added
 
-- Pending.
+- New `apps/landing` React + Vite marketing site with static asset deployment pipeline.
+- Landing Docker packaging assets under `docker/landing/` and `deploy/landing/docker-compose.yml`.
+- Landing deployment runbook at `docs/design/landing-deploy.md`.
+- GitHub Actions workflow for building Deck landing image and optionally publishing to GHCR.
 
-## [0.0.1] - 2026-02-25
+## [0.0.1-alpha.3] - 2026-02-26
+
+### Added
+
+- Client update notifications support in the desktop app (`feat(client)`, #4).
+
+### Fixed
+
+- Client IME input handling issues (`feat(client)`, #4).
+
+## [0.0.1-alpha.2] - 2026-02-26
+
+### Added
+
+- Local credential store implementation for the desktop client (`feat(client)`, #3).
+
+### Fixed
+
+- `computer-use` mouse scroll hang issue, plus regression checks for no-hang behavior (`fix(computer-use)`, #1).
+
+## [0.0.1-alpha.1] - 2026-02-25
 
 ### Added
 

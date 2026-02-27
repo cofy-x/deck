@@ -21,6 +21,7 @@
   "workspaces": [
     "apps/api",
     "apps/dashboard",
+    "apps/landing",
     "packages/core-ts",
     "packages/client-daemon-ts",
     "examples/daemon",

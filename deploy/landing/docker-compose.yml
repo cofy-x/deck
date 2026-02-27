@@ -1,0 +1,12 @@
+services:
+  landing:
+    image: deck/landing:latest
+    container_name: deck-landing
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:18080:80"
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1/healthz"]
+      interval: 30s
+      timeout: 3s
+      retries: 3

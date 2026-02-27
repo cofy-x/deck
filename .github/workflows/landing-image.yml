@@ -1,0 +1,127 @@
+name: Landing Image
+
+on:
+  workflow_dispatch:
+    inputs:
+      push_image:
+        description: Push image to GHCR
+        required: true
+        default: true
+        type: boolean
+  push:
+    branches:
+      - main
+    paths:
+      - apps/landing/**
+      - docker/landing/**
+      - deploy/landing/**
+      - docs/design/landing-deploy.md
+      - Makefile
+      - pnpm-lock.yaml
+      - pnpm-workspace.yaml
+      - package.json
+
+permissions:
+  contents: read
+  packages: write
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NS: ghcr.io/${{ github.repository_owner }}/deck
+  IMAGE_NAME: landing
+  SHA_TAG: sha-${{ github.sha }}
+
+jobs:
+  build-and-optional-push:
+    name: Build Landing Image (amd64)
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set push mode
+        id: mode
+        shell: bash
+        run: |
+          set -euo pipefail
+          should_push=false
+          if [[ "${GITHUB_EVENT_NAME}" == "push" ]]; then
+            should_push=true
+          elif [[ "${{ inputs.push_image }}" == "true" ]]; then
+            should_push=true
+          fi
+          echo "should_push=${should_push}" >> "${GITHUB_OUTPUT}"
+
+      - name: Build landing image
+        shell: bash
+        run: |
+          set -euo pipefail
+          docker build \
+            --platform linux/amd64 \
+            -t deck/landing:latest \
+            -f docker/landing/Dockerfile \
+            .
+
+      - name: Smoke test health endpoint
+        shell: bash
+        run: |
+          set -euo pipefail
+          container_id="$(docker run -d -p 18080:80 deck/landing:latest)"
+          cleanup() {
+            docker rm -f "${container_id}" >/dev/null 2>&1 || true
+          }
+          trap cleanup EXIT
+
+          ok=0
+          for _ in $(seq 1 30); do
+            if curl -fsS http://127.0.0.1:18080/healthz >/tmp/landing-health.txt; then
+              ok=1
+              break
+            fi
+            sleep 1
+          done
+
+          if [[ "${ok}" -ne 1 ]]; then
+            echo "Landing health check failed."
+            exit 1
+          fi
+
+      - name: Login to GHCR
+        if: steps.mode.outputs.should_push == 'true'
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Tag and push image
+        if: steps.mode.outputs.should_push == 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          target_repo="${IMAGE_NS}/${IMAGE_NAME}"
+
+          docker tag deck/landing:latest "${target_repo}:latest"
+          docker tag deck/landing:latest "${target_repo}:${SHA_TAG}"
+
+          docker push "${target_repo}:latest"
+          docker push "${target_repo}:${SHA_TAG}"
+
+      - name: Job summary
+        shell: bash
+        run: |
+          set -euo pipefail
+          target_repo="${IMAGE_NS}/${IMAGE_NAME}"
+          {
+            echo "## Landing Image Summary"
+            echo ""
+            echo "- Image (local): \`deck/landing:latest\`"
+            echo "- Push enabled: \`${{ steps.mode.outputs.should_push }}\`"
+            echo "- Commit: \`${GITHUB_SHA}\`"
+            echo "- SHA Tag: \`${SHA_TAG}\`"
+            echo ""
+            echo "### GHCR target"
+            echo "- \`${target_repo}:latest\`"
+            echo "- \`${target_repo}:${SHA_TAG}\`"
+          } >> "${GITHUB_STEP_SUMMARY}"
