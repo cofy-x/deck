@@ -1,0 +1,60 @@
+name: Landing Pages Deploy
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+    paths:
+      - apps/landing/**
+      - pnpm-lock.yaml
+      - pnpm-workspace.yaml
+      - package.json
+      - .github/workflows/landing-pages-deploy.yml
+
+permissions:
+  contents: read
+
+jobs:
+  deploy:
+    name: Deploy Landing to Cloudflare Pages
+    runs-on: ubuntu-latest
+    environment: production
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22.16.0'
+
+      - name: Enable Corepack
+        run: corepack enable
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build landing
+        run: pnpm --filter @cofy-x/deck-landing run build
+
+      - name: Resolve Cloudflare Pages project
+        id: resolve_project
+        shell: bash
+        env:
+          CF_PAGES_PROJECT: ${{ vars.CLOUDFLARE_PAGES_PROJECT }}
+        run: |
+          set -euo pipefail
+          project="${CF_PAGES_PROJECT:-deck}"
+          echo "project=${project}" >> "${GITHUB_OUTPUT}"
+
+      - name: Deploy via Wrangler
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          command: >-
+            pages deploy apps/landing/dist
+            --project-name=${{ steps.resolve_project.outputs.project }}
+            --commit-dirty=true

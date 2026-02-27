@@ -13,6 +13,11 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 - Landing Docker packaging assets under `docker/landing/` and `deploy/landing/docker-compose.yml`.
 - Landing deployment runbook at `docs/design/landing-deploy.md`.
 - GitHub Actions workflow for building Deck landing image and optionally publishing to GHCR.
+- GitHub Actions workflow for deploying `apps/landing/dist` to Cloudflare Pages.
+
+### Changed
+
+- Landing locale fallback now defaults to English unless a user-selected locale exists in local storage.
 
 ## [0.0.1-alpha.3] - 2026-02-26
 
