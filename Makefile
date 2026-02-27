@@ -53,11 +53,11 @@ DAEMON_BIN := daemon
 CLI_BIN    := cli
 
 .PHONY: all help install build test lint clean \
-        install-ts build-ts \
+        install-ts build-ts build-landing build-landing-image \
         install-go download-xterm build-go build-linux build-darwin build-darwin-amd64 \
 		build-windows build-all-platforms fmt-go lint-go test-go \
 		docker-dev-up docker-dev-down \
-		run-api run-dashboard \
+		run-api run-dashboard run-landing \
 		pilot-build pilot-build-host pilot-build-server pilot-build-bridge \
 		pilot-test pilot-test-host pilot-test-server pilot-test-bridge \
 		pilot-env-init pilot-bridge-env-init \
@@ -108,6 +108,12 @@ install-ts: ## Install Node.js dependencies
 build-ts: ## Build all TypeScript projects
 	@echo "Building TypeScript projects..."
 	@$(PNPM) run build
+
+build-landing: ## Build landing web app
+	@$(PNPM) --filter @cofy-x/deck-landing run build
+
+build-landing-image: ## Build landing Docker image
+	@docker build --platform linux/amd64 -t deck/landing:latest -f docker/landing/Dockerfile .
 
 test-ts: ## Run Vitest
 	@$(PNPM) run test
@@ -367,6 +373,9 @@ run-api: ## Run NestJS API in dev mode
 
 run-dashboard: ## Run React Dashboard in dev mode
 	@$(PNPM) --filter @cofy-x/deck-dashboard run dev
+
+run-landing: ## Run React Landing in dev mode
+	@$(PNPM) --filter @cofy-x/deck-landing run dev
 
 
 # ------------------------------------------------------------------------------

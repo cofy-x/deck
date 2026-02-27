@@ -72,6 +72,11 @@ execSync('pnpm --filter "./apps/dashboard" run build', {
   cwd: root,
 });
 
+execSync('pnpm --filter "./apps/landing" run build', {
+  stdio: 'inherit',
+  cwd: root,
+});
+
 execSync('pnpm --filter "./apps/pilot/host" run build', {
   stdio: 'inherit',
   cwd: root,

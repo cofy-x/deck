@@ -2,7 +2,7 @@
 
 Shared conventions for all React/TypeScript frontend applications in the deck monorepo.
 
-**Applies to:** `apps/client`, `apps/dashboard`
+**Applies to:** `apps/client`, `apps/dashboard`, `apps/landing`
 
 ## Tech Stack
 

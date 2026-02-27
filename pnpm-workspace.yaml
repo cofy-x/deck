@@ -1,6 +1,7 @@
 packages:
   - apps/api
   - apps/dashboard
+  - apps/landing
   - apps/client
   - packages/core-ts
   - packages/client-daemon-ts

@@ -6,7 +6,7 @@
 
 | Language | Manager | Config File | Workspace Members |
 | :--- | :--- | :--- | :--- |
-| Node.js / TypeScript | `pnpm` | `pnpm-workspace.yaml` | apps/api, apps/dashboard, apps/client, apps/pilot/*, packages/core-ts, packages/client-daemon-ts |
+| Node.js / TypeScript | `pnpm` | `pnpm-workspace.yaml` | apps/api, apps/dashboard, apps/landing, apps/client, apps/pilot/*, packages/core-ts, packages/client-daemon-ts |
 | Python | `uv` | `pyproject.toml` | apps/server-py, packages/core-py |
 | Go | `go work` | `go.work` | apps/cli, packages/daemon, packages/core-go, packages/computer-use, packages/client-daemon-go |
 | Rust | `cargo` | `apps/client/src-tauri/Cargo.toml` | Tauri backends |
@@ -20,6 +20,7 @@ deck/
 │   ├── cli/                       # Go CLI — MCP tool server for AI agent sandbox ops
 │   ├── client/                    # Tauri v2 desktop app — AI sandbox cockpit
 │   ├── dashboard/                 # React + Vite admin web UI
+│   ├── landing/                   # React + Vite marketing website
 │   ├── pilot/                     # Pilot suite
 │   │   ├── bridge/                # Messaging bridge (WhatsApp, Telegram, Slack, Feishu, Discord, DingTalk, Email, Mochat, QQ)
 │   │   ├── host/                  # Headless CLI orchestrator
@@ -52,10 +53,12 @@ deck/
 │       └── computer-use/          # Computer-use plugin Docker build
 │
 ├── deploy/
-│   └── local/                     # docker-compose for local dev (Redis, DB)
+│   ├── local/                     # docker-compose for local dev (Redis, DB)
+│   └── landing/                   # docker-compose for landing deployment
 │
 ├── docs/
 │   ├── design/daemon.md           # Daemon PID 1 technical design
+│   ├── design/landing-deploy.md   # Landing image deployment runbook
 │   └── opencode/                  # OpenCode API reference
 │
 ├── scripts/                       # Build and codegen scripts (JS)
@@ -126,6 +129,7 @@ make build-cli-sandbox-ai       # Build CLI-only sandbox image
 # Run individual apps
 make run-api              # Start NestJS API (dev mode)
 make run-dashboard        # Start React dashboard (dev mode)
+make run-landing          # Start React landing (dev mode)
 make dev-py               # Sync and run Python server
 
 # Pilot suite
