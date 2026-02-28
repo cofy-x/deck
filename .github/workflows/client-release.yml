@@ -29,11 +29,16 @@ jobs:
   release-client-macos:
     name: Release Client (macOS)
     runs-on: macos-14
-    timeout-minutes: 60
+    timeout-minutes: 180
     env:
       CI: true
       VERSION: ${{ inputs.version }}
       TAG: v${{ inputs.version }}
+      BUILD_RETRY_MAX: 3
+      BUILD_RETRY_DELAY_SECONDS: 60
+      APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
+      APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+      APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -82,6 +87,29 @@ jobs:
             exit 1
           fi
 
+      - name: Validate required Apple release secrets
+        shell: bash
+        env:
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        run: |
+          set -euo pipefail
+          missing=0
+          for name in \
+            APPLE_CERTIFICATE \
+            APPLE_CERTIFICATE_PASSWORD \
+            APPLE_SIGNING_IDENTITY \
+            APPLE_ID \
+            APPLE_PASSWORD \
+            APPLE_TEAM_ID; do
+            if [ -z "${!name:-}" ]; then
+              echo "::error::Missing required secret: $name"
+              missing=1
+            fi
+          done
+          test "$missing" -eq 0
+
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
@@ -103,13 +131,69 @@ jobs:
           EOF
           echo "TAURI_RELEASE_CONFIG=$config_path" >> "$GITHUB_ENV"
 
-      - name: Build DMG (unsigned)
-        run: pnpm --filter @cofy-x/deck-app tauri build --bundles dmg --ci --no-sign --config "$TAURI_RELEASE_CONFIG"
+      - name: Validate Apple notarization credentials
+        shell: bash
+        env:
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        run: |
+          set -euo pipefail
+          xcrun notarytool history \
+            --apple-id "$APPLE_ID" \
+            --password "$APPLE_PASSWORD" \
+            --team-id "$APPLE_TEAM_ID" \
+            --output-format json >/dev/null
 
-      - name: Build DMG (unsigned, x86_64)
-        run: pnpm --filter @cofy-x/deck-app tauri build --bundles dmg --ci --no-sign --target x86_64-apple-darwin --config "$TAURI_RELEASE_CONFIG"
+      - name: Build DMG (signed, arm64)
+        shell: bash
+        run: |
+          set -euo pipefail
+          max_attempts="${BUILD_RETRY_MAX:-3}"
+          delay_seconds="${BUILD_RETRY_DELAY_SECONDS:-60}"
+          attempt=1
 
-      - name: Verify DMG artifact exists
+          while true; do
+            echo "arm64 build attempt ${attempt}/${max_attempts}"
+            if pnpm --filter @cofy-x/deck-app tauri build --bundles dmg --ci --config "$TAURI_RELEASE_CONFIG"; then
+              break
+            fi
+
+            if [ "$attempt" -ge "$max_attempts" ]; then
+              echo "::error::arm64 build failed after ${max_attempts} attempts."
+              exit 1
+            fi
+
+            echo "Retrying arm64 build in ${delay_seconds}s..."
+            sleep "$delay_seconds"
+            attempt=$((attempt + 1))
+          done
+
+      - name: Build DMG (signed, x86_64)
+        shell: bash
+        run: |
+          set -euo pipefail
+          max_attempts="${BUILD_RETRY_MAX:-3}"
+          delay_seconds="${BUILD_RETRY_DELAY_SECONDS:-60}"
+          attempt=1
+
+          while true; do
+            echo "x86_64 build attempt ${attempt}/${max_attempts}"
+            if pnpm --filter @cofy-x/deck-app tauri build --bundles dmg --ci --target x86_64-apple-darwin --config "$TAURI_RELEASE_CONFIG"; then
+              break
+            fi
+
+            if [ "$attempt" -ge "$max_attempts" ]; then
+              echo "::error::x86_64 build failed after ${max_attempts} attempts."
+              exit 1
+            fi
+
+            echo "Retrying x86_64 build in ${delay_seconds}s..."
+            sleep "$delay_seconds"
+            attempt=$((attempt + 1))
+          done
+
+      - name: Verify DMG artifacts exist
         shell: bash
         run: |
           set -euo pipefail
@@ -117,15 +201,123 @@ jobs:
           arm_dmgs=(apps/client/src-tauri/target/release/bundle/dmg/*.dmg)
           amd_dmgs=(apps/client/src-tauri/target/x86_64-apple-darwin/release/bundle/dmg/*.dmg)
           if [ "${#arm_dmgs[@]}" -eq 0 ]; then
-            echo "No arm64 DMG files found under apps/client/src-tauri/target/release/bundle/dmg/"
+            echo "::error::No arm64 DMG found"
             exit 1
           fi
           if [ "${#amd_dmgs[@]}" -eq 0 ]; then
-            echo "No x86_64 DMG files found under apps/client/src-tauri/target/x86_64-apple-darwin/release/bundle/dmg/"
+            echo "::error::No x86_64 DMG found"
             exit 1
           fi
+          echo "arm64: ${arm_dmgs[*]}"
+          echo "x86_64: ${amd_dmgs[*]}"
 
-      - name: Upload DMG artifact
+      - name: Upload build artifacts (pre-notarization backup)
+        uses: actions/upload-artifact@v4
+        with:
+          name: deck-client-dmg-${{ inputs.version }}-signed
+          path: |
+            apps/client/src-tauri/target/release/bundle/dmg/*.dmg
+            apps/client/src-tauri/target/x86_64-apple-darwin/release/bundle/dmg/*.dmg
+          retention-days: 14
+          if-no-files-found: error
+
+      - name: Notarize and staple DMGs
+        shell: bash
+        env:
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          NOTARIZE_TIMEOUT: 5400
+          NOTARIZE_POLL_INTERVAL: 30
+        run: |
+          set -euo pipefail
+
+          notarize_and_staple() {
+            local dmg_path="$1"
+            local label="$2"
+            local timeout="${NOTARIZE_TIMEOUT}"
+            local interval="${NOTARIZE_POLL_INTERVAL}"
+
+            echo "::group::Notarize ${label}"
+            echo "Submitting: ${dmg_path}"
+
+            local submit_output
+            if ! submit_output=$(xcrun notarytool submit "$dmg_path" \
+              --apple-id "$APPLE_ID" \
+              --password "$APPLE_PASSWORD" \
+              --team-id "$APPLE_TEAM_ID" \
+              --output-format json 2>&1); then
+              echo "::error::Failed to submit ${label} for notarization"
+              echo "$submit_output"
+              echo "::endgroup::"
+              return 1
+            fi
+
+            local submission_id
+            submission_id=$(echo "$submit_output" | jq -r '.id // empty')
+            if [ -z "$submission_id" ]; then
+              echo "::error::Failed to parse submission ID"
+              echo "$submit_output"
+              echo "::endgroup::"
+              return 1
+            fi
+
+            echo "Submission ID: ${submission_id}"
+            echo "Polling (timeout: $((timeout / 60))m, interval: ${interval}s)..."
+
+            local elapsed=0
+            while [ "$elapsed" -lt "$timeout" ]; do
+              sleep "$interval"
+              elapsed=$((elapsed + interval))
+
+              local info_output
+              info_output=$(xcrun notarytool info "$submission_id" \
+                --apple-id "$APPLE_ID" \
+                --password "$APPLE_PASSWORD" \
+                --team-id "$APPLE_TEAM_ID" \
+                --output-format json 2>/dev/null) || continue
+
+              local status
+              status=$(echo "$info_output" | jq -r '.status // "In Progress"')
+
+              case "$status" in
+                Accepted)
+                  echo "Notarization accepted!"
+                  xcrun stapler staple "$dmg_path"
+                  echo "Stapled successfully."
+                  echo "::endgroup::"
+                  return 0
+                  ;;
+                Invalid|Rejected)
+                  echo "::error::Notarization ${status} for ${label}"
+                  echo "Fetching rejection log..."
+                  xcrun notarytool log "$submission_id" \
+                    --apple-id "$APPLE_ID" \
+                    --password "$APPLE_PASSWORD" \
+                    --team-id "$APPLE_TEAM_ID" 2>&1 || true
+                  echo "::endgroup::"
+                  return 1
+                  ;;
+              esac
+
+              echo "[${label}] Status: ${status} — $((elapsed / 60))m$((elapsed % 60))s elapsed"
+            done
+
+            echo "::error::${label} notarization timed out after $((timeout / 60))m"
+            echo "::notice::Submission ID: ${submission_id}"
+            echo "::notice::Check manually: xcrun notarytool info ${submission_id} --apple-id \$APPLE_ID --password \$APPLE_PASSWORD --team-id \$APPLE_TEAM_ID"
+            echo "::endgroup::"
+            return 1
+          }
+
+          shopt -s nullglob
+          arm_dmgs=(apps/client/src-tauri/target/release/bundle/dmg/*.dmg)
+          amd_dmgs=(apps/client/src-tauri/target/x86_64-apple-darwin/release/bundle/dmg/*.dmg)
+
+          notarize_and_staple "${arm_dmgs[0]}" "arm64"
+          notarize_and_staple "${amd_dmgs[0]}" "x86_64"
+
+      - name: Upload notarized DMG artifacts
         uses: actions/upload-artifact@v4
         with:
           name: deck-client-dmg-${{ inputs.version }}

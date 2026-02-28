@@ -1,0 +1,127 @@
+name: Client Signing Check
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: client-signing-check-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  signing-check-macos:
+    name: Signing Check (macOS)
+    runs-on: macos-14
+    timeout-minutes: 20
+    env:
+      APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
+      APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+      APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
+      APPLE_ID: ${{ secrets.APPLE_ID }}
+      APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
+      APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Validate required secrets
+        shell: bash
+        run: |
+          set -euo pipefail
+          missing=0
+          for name in \
+            APPLE_CERTIFICATE \
+            APPLE_CERTIFICATE_PASSWORD \
+            APPLE_SIGNING_IDENTITY \
+            APPLE_ID \
+            APPLE_PASSWORD \
+            APPLE_TEAM_ID; do
+            if [ -z "${!name:-}" ]; then
+              echo "::error::Missing required secret: $name"
+              missing=1
+            fi
+          done
+          test "$missing" -eq 0
+
+      - name: Import Apple code signing certificate
+        uses: apple-actions/import-codesign-certs@v3
+        with:
+          p12-file-base64: ${{ env.APPLE_CERTIFICATE }}
+          p12-password: ${{ env.APPLE_CERTIFICATE_PASSWORD }}
+
+      - name: List available code signing identities
+        shell: bash
+        run: |
+          set -euo pipefail
+          security find-identity -v -p codesigning
+
+      - name: Check required signing identity exists
+        shell: bash
+        run: |
+          set -euo pipefail
+          if ! security find-identity -v -p codesigning | grep -F "${APPLE_SIGNING_IDENTITY}" >/dev/null; then
+            echo "::error::Signing identity not found after import: ${APPLE_SIGNING_IDENTITY}"
+            exit 1
+          fi
+
+      - name: Validate Apple notarization credentials
+        shell: bash
+        run: |
+          set -euo pipefail
+          xcrun notarytool history \
+            --apple-id "$APPLE_ID" \
+            --password "$APPLE_PASSWORD" \
+            --team-id "$APPLE_TEAM_ID" \
+            --output-format json >/dev/null
+
+      - name: Codesign a temporary app bundle
+        shell: bash
+        run: |
+          set -euo pipefail
+          app_root="$RUNNER_TEMP/DeckSigningCheck.app"
+          mkdir -p "$app_root/Contents/MacOS"
+
+          cat > "$app_root/Contents/Info.plist" <<'EOF'
+          <?xml version="1.0" encoding="UTF-8"?>
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+          <plist version="1.0">
+          <dict>
+            <key>CFBundleExecutable</key>
+            <string>DeckSigningCheck</string>
+            <key>CFBundleIdentifier</key>
+            <string>com.cofy-x.deck.signing-check</string>
+            <key>CFBundleName</key>
+            <string>DeckSigningCheck</string>
+            <key>CFBundlePackageType</key>
+            <string>APPL</string>
+            <key>CFBundleVersion</key>
+            <string>1</string>
+            <key>CFBundleShortVersionString</key>
+            <string>1.0.0</string>
+          </dict>
+          </plist>
+          EOF
+
+          cat > "$app_root/Contents/MacOS/DeckSigningCheck" <<'EOF'
+          #!/usr/bin/env bash
+          echo "Deck signing check"
+          EOF
+          chmod +x "$app_root/Contents/MacOS/DeckSigningCheck"
+
+          codesign --force --timestamp --options runtime --sign "$APPLE_SIGNING_IDENTITY" "$app_root"
+          codesign --verify --deep --strict --verbose=2 "$app_root"
+
+      - name: Write summary
+        shell: bash
+        run: |
+          set -euo pipefail
+          {
+            echo "## Client Signing Check"
+            echo ""
+            echo "- Signing identity import: success"
+            echo "- Identity lookup: success"
+            echo "- notarytool credential check: success"
+            echo "- Temporary app codesign verify: success"
+          } >> "$GITHUB_STEP_SUMMARY"
