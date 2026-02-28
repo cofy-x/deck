@@ -22,7 +22,7 @@ docker run \
     -e VNC_RESOLUTION=1280x720 \
     -e VNC_USER=deck \
     -e DECK_LOG_LEVEL=debug \
-    deck/desktop-sandbox-ai:latest
+    ghcr.io/cofy-x/deck/desktop-sandbox-ai:latest
 
 echo "Desktop sandbox AI deployed."
 

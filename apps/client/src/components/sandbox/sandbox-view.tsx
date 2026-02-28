@@ -4,14 +4,15 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 import { useState, useEffect, useCallback } from 'react';
-import { Monitor, Loader2, Play, AlertTriangle, RefreshCw } from 'lucide-react';
+import { Monitor, Loader2, Play, AlertTriangle, RefreshCw, CircleX, ExternalLink } from 'lucide-react';
 import { t } from '@/i18n';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
 import { SandboxToolbar } from './sandbox-toolbar';
 import { useSandboxStore } from '@/stores/sandbox-store';
-import { useSandboxState } from '@/hooks/use-sandbox';
+import { useViewerStore } from '@/stores/viewer-store';
+import { useSandboxState, useCancelSandboxStart } from '@/hooks/use-sandbox';
 import { useActiveConnection } from '@/hooks/use-connection';
 import {
   daemonProbe,
@@ -225,7 +226,12 @@ function useDesktopBoot(input: {
 function SandboxPlaceholder() {
   const status = useSandboxState();
   const errorMessage = useSandboxStore((s) => s.errorMessage);
+  const pullPercent = useSandboxStore((s) => s.pullPercent);
+  const pullLayersDone = useSandboxStore((s) => s.pullLayersDone);
+  const pullLayersTotal = useSandboxStore((s) => s.pullLayersTotal);
+  const setViewerMode = useViewerStore((s) => s.setMode);
   const { isRemote } = useActiveConnection();
+  const cancelPull = useCancelSandboxStart();
 
   if (status === 'error') {
     return (
@@ -254,6 +260,15 @@ function SandboxPlaceholder() {
     status === 'checking' ||
     status === 'connecting'
   ) {
+    const progressValue =
+      status === 'pulling' && pullPercent != null
+        ? pullPercent
+        : status === 'connecting'
+          ? 45
+          : status === 'pulling'
+            ? 0
+            : 70;
+
     return (
       <div className="flex h-full items-center justify-center bg-muted/30 p-8">
         <Card className="w-full max-w-md">
@@ -273,10 +288,38 @@ function SandboxPlaceholder() {
                   ? t('sandbox.building_desc')
                   : t('sandbox.starting_ai_desc')}
             </p>
-            <Progress
-              value={status === 'connecting' ? 45 : status === 'pulling' ? 30 : 70}
-              className="w-full"
-            />
+            <div className="w-full space-y-1">
+              <Progress value={progressValue} className="w-full" />
+              {status === 'pulling' && pullLayersTotal > 0 && (
+                <p className="text-center text-xs text-muted-foreground">
+                  {t('sandbox.pull_layers')
+                    .replace('{done}', String(pullLayersDone))
+                    .replace('{total}', String(pullLayersTotal))}
+                </p>
+              )}
+            </div>
+            {status === 'pulling' && (
+              <div className="flex items-center gap-3">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="text-muted-foreground"
+                  onClick={() => setViewerMode('viewer')}
+                >
+                  <ExternalLink className="mr-1.5 h-3.5 w-3.5" />
+                  {t('sandbox.view_pull_logs')}
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="text-muted-foreground"
+                  onClick={cancelPull}
+                >
+                  <CircleX className="mr-1.5 h-3.5 w-3.5" />
+                  {t('sandbox.cancel_pull')}
+                </Button>
+              </div>
+            )}
           </CardContent>
         </Card>
       </div>

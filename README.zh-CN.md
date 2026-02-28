@@ -43,18 +43,11 @@
 
 ## 🚀 快速开始
 
-### 1. 拉取沙箱镜像
-
-```bash
-docker pull ghcr.io/cofy-x/deck/desktop-sandbox-ai:latest
-docker tag  ghcr.io/cofy-x/deck/desktop-sandbox-ai:latest deck/desktop-sandbox-ai:latest
-```
-
-### 2. 安装应用
+### 1. 安装应用
 
 从 **[GitHub Releases](https://github.com/cofy-x/deck/releases)** 下载最新的预发布 DMG，将 `deck.app` 拖入 `/Applications`。
 
-### 3. macOS 首次启动
+### 2. macOS 首次启动
 
 如果 macOS 提示应用已损坏或被阻止：
 
@@ -63,9 +56,15 @@ xattr -dr com.apple.quarantine /Applications/deck.app
 open /Applications/deck.app
 ```
 
-### 4. 启动沙箱
+### 3. 启动沙箱
 
 打开应用，选择内置的 **Local** 配置文件，点击 **Start Sandbox**。
+首次运行时应用会自动拉取 `ghcr.io/cofy-x/deck/desktop-sandbox-ai:latest` 镜像，并显示实时进度。
+
+> **提示：** 也可以提前手动拉取镜像：
+> ```bash
+> docker pull ghcr.io/cofy-x/deck/desktop-sandbox-ai:latest
+> ```
 
 ---
 

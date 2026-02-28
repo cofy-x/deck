@@ -37,7 +37,7 @@ export const LOCAL_WEB_TERMINAL_URL = `http://127.0.0.1:${PORTS.WEB_TERMINAL}`;
 // ---------------------------------------------------------------------------
 
 export const CONTAINER_NAME = 'deck-desktop-sandbox-ai';
-export const DEFAULT_IMAGE = 'deck/desktop-sandbox-ai:latest';
+export const DEFAULT_IMAGE = 'ghcr.io/cofy-x/deck/desktop-sandbox-ai:latest';
 
 // ---------------------------------------------------------------------------
 // Language preference

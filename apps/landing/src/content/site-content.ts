@@ -103,11 +103,6 @@ export const SITE_CONTENT: Record<Locale, SiteContent> = {
         'Get a running sandbox in minutes. This mirrors the primary setup flow from the repository README.',
       steps: [
         {
-          title: 'Pull sandbox image',
-          command:
-            'docker pull ghcr.io/cofy-x/deck/desktop-sandbox-ai:latest\ndocker tag ghcr.io/cofy-x/deck/desktop-sandbox-ai:latest deck/desktop-sandbox-ai:latest',
-        },
-        {
           title: 'Install the desktop app',
           command: 'Download deck.app from GitHub Releases and move it to /Applications.',
         },
@@ -245,11 +240,6 @@ export const SITE_CONTENT: Record<Locale, SiteContent> = {
       title: '快速开始',
       description: '几分钟内启动第一个沙箱，流程与仓库 README 保持一致。',
       steps: [
-        {
-          title: '拉取沙箱镜像',
-          command:
-            'docker pull ghcr.io/cofy-x/deck/desktop-sandbox-ai:latest\ndocker tag ghcr.io/cofy-x/deck/desktop-sandbox-ai:latest deck/desktop-sandbox-ai:latest',
-        },
         {
           title: '安装桌面应用',
           command: '从 GitHub Releases 下载 deck.app 并移动到 /Applications。',

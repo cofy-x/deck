@@ -318,9 +318,14 @@ export const en: Record<string, string> = {
   'sandbox.connecting_remote': 'Connecting Remote Sandbox...',
   'sandbox.connecting_remote_desc':
     'Verifying the remote OpenCode service and preparing the cockpit.',
-  'sandbox.building': 'Building your Sandbox...',
+  'sandbox.building': 'Pulling Sandbox Image...',
   'sandbox.building_desc':
     'Downloading the container image. This may take a few minutes on first run.',
+  'sandbox.cancel_pull': 'Cancel',
+  'sandbox.pull_layers': '{done}/{total} layers',
+  'sandbox.view_pull_logs': 'View Logs',
+  'sandbox.pull_log_title': 'Image Pull Log',
+  'sandbox.pull_log_waiting': 'Waiting for pull output...',
   'sandbox.starting_ai': 'Starting AI Assistant...',
   'sandbox.starting_ai_desc':
     'Initializing the desktop environment and AI services.',

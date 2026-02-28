@@ -17,6 +17,7 @@ import {
   Play,
   Square,
   Loader2,
+  CircleX,
 } from 'lucide-react';
 import { Toaster, toast } from 'sonner';
 import {
@@ -58,6 +59,7 @@ import {
   useSandboxState,
   useStartSandbox,
   useStopSandbox,
+  useCancelSandboxStart,
 } from '@/hooks/use-sandbox';
 import { cn } from '@/lib/utils';
 import { t } from '@/i18n';
@@ -98,6 +100,7 @@ export function CockpitLayout() {
   const collapsePanel = useViewerStore((s) => s.collapsePanel);
   const startSandbox = useStartSandbox();
   const stopSandbox = useStopSandbox();
+  const cancelPull = useCancelSandboxStart();
   const profiles = useConnectionStore((s) => s.profiles);
   const setActiveProfile = useConnectionStore((s) => s.setActiveProfile);
   const switchNonce = useConnectionStore((s) => s.switchNonce);
@@ -368,7 +371,16 @@ export function CockpitLayout() {
                   </>
                 )}
               </DropdownMenuItem>
-              {sandboxActionDisabled && (
+              {sandboxStatus === 'pulling' && (
+                <DropdownMenuItem
+                  onSelect={() => cancelPull()}
+                  className="text-xs"
+                >
+                  <CircleX className="h-3.5 w-3.5 text-muted-foreground" />
+                  {t('sandbox.cancel_pull')}
+                </DropdownMenuItem>
+              )}
+              {sandboxActionDisabled && sandboxStatus !== 'pulling' && (
                 <div className="flex items-center gap-1.5 px-2 py-1 text-[11px] text-muted-foreground">
                   <Loader2 className="h-3 w-3 animate-spin" />
                   {t('layout.sandbox_state_changing')}

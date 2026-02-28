@@ -43,18 +43,11 @@
 
 ## 🚀 Quick Start
 
-### 1. Pull the sandbox image
-
-```bash
-docker pull ghcr.io/cofy-x/deck/desktop-sandbox-ai:latest
-docker tag  ghcr.io/cofy-x/deck/desktop-sandbox-ai:latest deck/desktop-sandbox-ai:latest
-```
-
-### 2. Install the app
+### 1. Install the app
 
 Download the latest prerelease from **[GitHub Releases](https://github.com/cofy-x/deck/releases)** and drag `deck.app` into `/Applications`.
 
-### 3. First launch on macOS
+### 2. First launch on macOS
 
 If macOS says the app is damaged or blocked:
 
@@ -63,9 +56,15 @@ xattr -dr com.apple.quarantine /Applications/deck.app
 open /Applications/deck.app
 ```
 
-### 4. Start a sandbox
+### 3. Start a sandbox
 
 Open the app, select the built-in **Local** profile, and click **Start Sandbox**.
+The app will automatically pull `ghcr.io/cofy-x/deck/desktop-sandbox-ai:latest` on first run with a live progress indicator.
+
+> **Tip:** To pre-pull the image manually:
+> ```bash
+> docker pull ghcr.io/cofy-x/deck/desktop-sandbox-ai:latest
+> ```
 
 ---
 
