@@ -4,7 +4,9 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 import { useState, useEffect, useCallback } from 'react';
-import { Monitor, Loader2, Play, AlertTriangle, RefreshCw, CircleX, ExternalLink } from 'lucide-react';
+import { Monitor, Loader2, Play, AlertTriangle, RefreshCw, CircleX, ExternalLink, FolderOpen } from 'lucide-react';
+import { invoke } from '@tauri-apps/api/core';
+import { revealItemInDir } from '@tauri-apps/plugin-opener';
 import { t } from '@/i18n';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -20,6 +22,15 @@ import {
   startComputerUse,
   probeNoVNC,
 } from '@/lib/daemon';
+
+async function openLogDirectory() {
+  try {
+    const logDir = await invoke<string>('get_app_log_dir');
+    await revealItemInDir(logDir);
+  } catch (err) {
+    console.error('[sandbox-view] Failed to open log directory:', err);
+  }
+}
 
 // ---------------------------------------------------------------------------
 // Boot stages for the sandbox desktop
@@ -248,6 +259,15 @@ function SandboxPlaceholder() {
             <p className="text-center text-xs text-muted-foreground">
               {t('sandbox.retry_from_chat_hint')}
             </p>
+            <Button
+              variant="ghost"
+              size="sm"
+              className="text-muted-foreground"
+              onClick={() => void openLogDirectory()}
+            >
+              <FolderOpen className="mr-1.5 h-3.5 w-3.5" />
+              {t('sandbox.open_log_dir')}
+            </Button>
           </CardContent>
         </Card>
       </div>
@@ -377,6 +397,15 @@ function BootProgress({
             <p className="text-center text-sm text-muted-foreground">
               {errorMsg ?? t('sandbox.boot_error_default')}
             </p>
+            <Button
+              variant="ghost"
+              size="sm"
+              className="text-muted-foreground"
+              onClick={() => void openLogDirectory()}
+            >
+              <FolderOpen className="mr-1.5 h-3.5 w-3.5" />
+              {t('sandbox.open_log_dir')}
+            </Button>
           </CardContent>
         </Card>
       </div>

@@ -6,10 +6,12 @@
   "permissions": [
     "core:default",
     "opener:default",
+    "opener:allow-reveal-item-in-dir",
     "shell:default",
     "http:default",
     "dialog:default",
     "process:default",
+    "log:default",
     {
       "identifier": "http:default",
       "allow": [

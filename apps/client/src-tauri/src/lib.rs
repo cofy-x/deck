@@ -19,11 +19,46 @@ use pilot_runtime::{
     pilot_runtime_health, pilot_runtime_start, pilot_runtime_status, pilot_runtime_stop,
     PilotRuntimeManager,
 };
+use log::{error, info};
 use tauri::Emitter;
 
 use std::sync::Arc;
 
 use sandbox::{DockerInfo, PullCancelToken, SandboxConfig, SandboxStatus};
+
+fn log_startup_diagnostics() {
+    info!("[deck] OS: {} / {}", std::env::consts::OS, std::env::consts::ARCH);
+    info!("[deck] Executable: {:?}", std::env::current_exe().unwrap_or_default());
+    info!("[deck] CWD: {:?}", std::env::current_dir().unwrap_or_default());
+    info!("[deck] PATH: {}", std::env::var("PATH").unwrap_or_default());
+
+    let docker = sandbox::check_docker_available();
+    info!(
+        "[deck] Docker: available={} path={:?} error={:?}",
+        docker.available,
+        docker.resolved_path,
+        docker.error
+    );
+}
+
+fn install_panic_hook() {
+    let default_hook = std::panic::take_hook();
+    std::panic::set_hook(Box::new(move |info| {
+        let location = info
+            .location()
+            .map(|l| format!("{}:{}:{}", l.file(), l.line(), l.column()))
+            .unwrap_or_else(|| "<unknown>".into());
+        let payload = if let Some(s) = info.payload().downcast_ref::<&str>() {
+            s.to_string()
+        } else if let Some(s) = info.payload().downcast_ref::<String>() {
+            s.clone()
+        } else {
+            "<non-string panic>".into()
+        };
+        error!("[deck] PANIC at {}: {}", location, payload);
+        default_hook(info);
+    }));
+}
 
 // ---------------------------------------------------------------------------
 // API logging (dev mode diagnostics)
@@ -74,7 +109,7 @@ async fn stop_opencode_web_bridge(
 
 #[tauri::command]
 fn check_docker() -> DockerInfo {
-    println!("[deck] Command: check_docker");
+    info!("[deck] Command: check_docker");
     sandbox::check_docker_available()
 }
 
@@ -89,65 +124,92 @@ async fn start_sandbox(
     state: tauri::State<'_, sandbox::SharedPullCancelToken>,
     config: Option<SandboxConfig>,
 ) -> Result<String, String> {
-    println!("[deck] Command: start_sandbox, config: {:?}", config);
+    info!("[deck] Command: start_sandbox, config: {:?}", config);
     let cfg = config.unwrap_or_default();
     let image = cfg.image().to_string();
     let token = Arc::clone(&state);
 
     tokio::task::spawn_blocking(move || {
-        println!("[deck] Step 1: Checking image {}...", image);
+        info!("[deck] Step 1: Checking image {}...", image);
 
         if !sandbox::image_exists(&image) {
-            println!("[deck] Image not found, pulling...");
+            info!("[deck] Image not found, pulling...");
             match sandbox::pull_image_with_progress(&image, &token, |progress| {
                 let _ = app.emit("sandbox-pull-progress", progress);
             }) {
-                Ok(msg) => println!("[deck] Pull result: {}", msg),
+                Ok(msg) => info!("[deck] Pull result: {}", msg),
                 Err(msg) => return Err(format!("Failed to pull image: {}", msg)),
             }
         } else {
-            println!("[deck] Image already exists, skipping pull");
+            info!("[deck] Image already exists, skipping pull");
         }
 
-        println!("[deck] Step 2: Starting container...");
+        info!("[deck] Step 2: Starting container...");
         sandbox::start_container(&cfg)
     })
     .await
     .map_err(|e| {
         let msg = format!("Task join error: {}", e);
-        eprintln!("[deck] {}", msg);
+        error!("[deck] {}", msg);
         msg
     })?
 }
 
 #[tauri::command]
 fn cancel_sandbox_start(state: tauri::State<'_, sandbox::SharedPullCancelToken>) {
-    println!("[deck] Command: cancel_sandbox_start");
+    info!("[deck] Command: cancel_sandbox_start");
     state.cancel();
 }
 
 #[tauri::command]
 async fn stop_sandbox() -> Result<String, String> {
-    println!("[deck] Command: stop_sandbox");
+    info!("[deck] Command: stop_sandbox");
     tokio::task::spawn_blocking(|| sandbox::stop_container(None))
         .await
         .map_err(|e| {
             let msg = format!("Task join error: {}", e);
-            eprintln!("[deck] {}", msg);
+            error!("[deck] {}", msg);
             msg
         })?
 }
 
+// ---------------------------------------------------------------------------
+// Application log path command
+// ---------------------------------------------------------------------------
+
+#[tauri::command]
+fn get_app_log_dir(app: tauri::AppHandle) -> Result<String, String> {
+    app.path()
+        .app_log_dir()
+        .map(|p| p.display().to_string())
+        .map_err(|e| format!("Failed to resolve app log dir: {}", e))
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
-    println!("[deck] Starting Deck application...");
+    let log_plugin = tauri_plugin_log::Builder::new()
+        .target(tauri_plugin_log::Target::new(
+            tauri_plugin_log::TargetKind::LogDir { file_name: Some("deck".into()) },
+        ))
+        .target(tauri_plugin_log::Target::new(
+            tauri_plugin_log::TargetKind::Stdout,
+        ))
+        .max_file_size(5_000_000)
+        .rotation_strategy(tauri_plugin_log::RotationStrategy::KeepAll)
+        .level(log::LevelFilter::Info)
+        .build();
+
     tauri::Builder::default()
+        .plugin(log_plugin)
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_shell::init())
         .plugin(tauri_plugin_http::init())
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_process::init())
         .setup(|app| {
+            install_panic_hook();
+            info!("[deck] Starting Deck application...");
+            log_startup_diagnostics();
             let store = init_credential_store(app)
                 .expect("failed to initialise credential store");
             app.manage(store);
@@ -162,6 +224,7 @@ pub fn run() {
             start_sandbox,
             stop_sandbox,
             cancel_sandbox_start,
+            get_app_log_dir,
             log_api_call,
             log_sse_trace_entry,
             get_sse_trace_log_path,

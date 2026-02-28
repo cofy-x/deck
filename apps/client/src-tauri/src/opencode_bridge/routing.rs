@@ -1,5 +1,6 @@
 use base64::engine::general_purpose::URL_SAFE_NO_PAD;
 use base64::Engine;
+use log::warn;
 use reqwest::Url;
 
 use super::BRIDGE_IFRAME_PATH;
@@ -186,12 +187,12 @@ fn sanitize_directory_query(
     }
 
     if let Some(directory) = forced_directory {
-        eprintln!(
+        warn!(
             "[opencode-bridge] repaired corrupted query directory value with forced directory={}",
             directory
         );
     } else {
-        eprintln!(
+        warn!(
             "[opencode-bridge] dropped corrupted query directory value without forced directory"
         );
     }

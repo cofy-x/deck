@@ -1,12 +1,70 @@
 use std::collections::HashMap;
 use std::io::{BufRead, BufReader};
+use std::path::Path;
 use std::process::{Command, Stdio};
 use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
 use std::sync::Arc;
 
+use log::{debug, error, info, warn};
 use serde::Serialize;
 
 use super::config::{DockerInfo, SandboxConfig, SandboxPorts, DEFAULT_CONTAINER_NAME};
+
+// ---------------------------------------------------------------------------
+// Docker binary resolution
+//
+// macOS / Linux GUI apps often lack /usr/local/bin in PATH.
+// Windows GUI apps inherit a full PATH but Docker Desktop may install to
+// a Program Files location that is not always present.
+// ---------------------------------------------------------------------------
+
+#[cfg(not(target_os = "windows"))]
+fn platform_docker_candidates() -> Vec<String> {
+    let mut candidates: Vec<String> = vec![
+        "/usr/local/bin/docker".into(),
+        "/opt/homebrew/bin/docker".into(),
+        "/usr/bin/docker".into(),
+    ];
+    if let Ok(home) = std::env::var("HOME") {
+        candidates.push(format!("{}/.docker/bin/docker", home));
+    }
+    candidates
+}
+
+#[cfg(target_os = "windows")]
+fn platform_docker_candidates() -> Vec<String> {
+    let mut candidates = Vec::new();
+    if let Ok(pf) = std::env::var("ProgramFiles") {
+        candidates.push(format!("{}\\Docker\\Docker\\resources\\bin\\docker.exe", pf));
+    }
+    if let Ok(pf86) = std::env::var("ProgramFiles(x86)") {
+        candidates.push(format!("{}\\Docker\\Docker\\resources\\bin\\docker.exe", pf86));
+    }
+    if let Ok(local) = std::env::var("LOCALAPPDATA") {
+        candidates.push(format!("{}\\Docker\\Docker\\resources\\bin\\docker.exe", local));
+    }
+    candidates
+}
+
+fn resolve_docker_bin() -> String {
+    for candidate in platform_docker_candidates() {
+        if Path::new(&candidate).is_file() {
+            debug!("[deck-docker] Resolved docker binary: {}", candidate);
+            return candidate;
+        }
+    }
+
+    debug!("[deck-docker] Docker binary not found in known paths, falling back to PATH lookup");
+    if cfg!(target_os = "windows") {
+        "docker.exe".to_string()
+    } else {
+        "docker".to_string()
+    }
+}
+
+fn docker_cmd() -> Command {
+    Command::new(resolve_docker_bin())
+}
 
 // ---------------------------------------------------------------------------
 // Pull cancellation token
@@ -23,7 +81,17 @@ impl PullCancelToken {
         self.cancelled.store(true, Ordering::SeqCst);
         let pid = self.child_pid.load(Ordering::SeqCst);
         if pid != 0 {
-            let _ = Command::new("kill").arg(pid.to_string()).output();
+            #[cfg(unix)]
+            {
+                // SIGTERM for graceful shutdown
+                unsafe { libc::kill(pid as i32, libc::SIGTERM); }
+            }
+            #[cfg(windows)]
+            {
+                let _ = Command::new("taskkill")
+                    .args(["/PID", &pid.to_string(), "/F"])
+                    .output();
+            }
         }
     }
 
@@ -119,7 +187,7 @@ fn parse_exact_container_id_from_ps_output(output: &str, expected_name: &str) ->
 }
 
 fn running_container_id_by_exact_name(name: &str) -> Option<String> {
-    let output = Command::new("docker")
+    let output = docker_cmd()
         .args(["ps", "--format", "{{.ID}}\t{{.Names}}"])
         .output()
         .ok()?;
@@ -132,36 +200,47 @@ fn running_container_id_by_exact_name(name: &str) -> Option<String> {
 }
 
 pub fn check_docker_available() -> DockerInfo {
-    println!("[deck-docker] Checking Docker availability...");
-    match Command::new("docker").arg("info").output() {
+    let resolved = resolve_docker_bin();
+    info!("[deck-docker] Checking Docker availability (binary: {})...", resolved);
+    match Command::new(&resolved).arg("info").output() {
         Ok(output) => {
             if output.status.success() {
-                println!("[deck-docker] Docker is available");
+                info!("[deck-docker] Docker is available at {}", resolved);
                 DockerInfo {
                     available: true,
                     error: None,
+                    resolved_path: Some(resolved),
                 }
             } else {
                 let stderr = String::from_utf8_lossy(&output.stderr).to_string();
-                eprintln!("[deck-docker] Docker not available: {}", stderr);
+                error!("[deck-docker] Docker not available: {}", stderr);
                 DockerInfo {
                     available: false,
                     error: Some(stderr),
+                    resolved_path: Some(resolved),
                 }
             }
         }
         Err(e) => {
-            eprintln!("[deck-docker] Docker binary not found: {}", e);
+            let current_path = std::env::var("PATH").unwrap_or_default();
+            error!(
+                "[deck-docker] Docker binary not found: {} (resolved={}, PATH={})",
+                e, resolved, current_path
+            );
             DockerInfo {
                 available: false,
-                error: Some(format!("Docker not found: {}", e)),
+                error: Some(format!(
+                    "Docker not found at '{}': {}. Ensure Docker Desktop is installed.",
+                    resolved, e
+                )),
+                resolved_path: None,
             }
         }
     }
 }
 
 pub fn image_exists(image: &str) -> bool {
-    match Command::new("docker")
+    match docker_cmd()
         .args([
             "images",
             "--format",
@@ -174,11 +253,11 @@ pub fn image_exists(image: &str) -> bool {
         Ok(output) => {
             let stdout = String::from_utf8_lossy(&output.stdout);
             let exists = stdout.lines().any(|line| line.trim() == image);
-            println!("[deck-docker] Image '{}' exists: {}", image, exists);
+            info!("[deck-docker] Image '{}' exists: {}", image, exists);
             exists
         }
         Err(e) => {
-            eprintln!("[deck-docker] Failed to check image: {}", e);
+            error!("[deck-docker] Failed to check image: {}", e);
             false
         }
     }
@@ -186,7 +265,7 @@ pub fn image_exists(image: &str) -> bool {
 
 pub fn is_container_running(name: &str) -> bool {
     let running = running_container_id_by_exact_name(name).is_some();
-    println!("[deck-docker] Container '{}' running: {}", name, running);
+    debug!("[deck-docker] Container '{}' running: {}", name, running);
     running
 }
 
@@ -234,7 +313,7 @@ pub fn pull_image_with_progress<F>(
 where
     F: Fn(&PullProgress),
 {
-    println!("[deck-docker] Pulling image: {}...", image);
+    info!("[deck-docker] Pulling image: {}...", image);
     cancel_token.reset();
 
     on_progress(&PullProgress {
@@ -245,14 +324,14 @@ where
         layers_total: 0,
     });
 
-    let mut child = Command::new("docker")
+    let mut child = docker_cmd()
         .args(["pull", image])
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
         .spawn()
         .map_err(|e| {
             let msg = format!("Failed to execute docker pull: {}", e);
-            eprintln!("[deck-docker] {}", msg);
+            error!("[deck-docker] {}", msg);
             msg
         })?;
 
@@ -267,7 +346,7 @@ where
         let reader = BufReader::new(out);
         for line in reader.lines() {
             if cancel_token.is_cancelled() {
-                println!("[deck-docker] Pull cancelled by user");
+                info!("[deck-docker] Pull cancelled by user");
                 let _ = child.kill();
                 let _ = child.wait();
                 return Err("Pull cancelled".to_string());
@@ -281,7 +360,7 @@ where
             if trimmed.is_empty() {
                 continue;
             }
-            println!("[deck-docker] {}", trimmed);
+            debug!("[deck-docker] {}", trimmed);
 
             if let Some((layer_id, status)) = trimmed.split_once(':') {
                 let layer_id = layer_id.trim();
@@ -326,13 +405,13 @@ where
 
     let status = child.wait().map_err(|e| {
         let msg = format!("Failed to wait for docker pull: {}", e);
-        eprintln!("[deck-docker] {}", msg);
+        error!("[deck-docker] {}", msg);
         msg
     })?;
 
     if status.success() {
         let msg = format!("Successfully pulled {}", image);
-        println!("[deck-docker] {}", msg);
+        info!("[deck-docker] {}", msg);
         on_progress(&PullProgress {
             stage: "complete".into(),
             message: msg.clone(),
@@ -356,7 +435,7 @@ where
             }
         }
         let msg = format!("Failed to pull {}: {}", image, err_output);
-        eprintln!("[deck-docker] {}", msg);
+        error!("[deck-docker] {}", msg);
         on_progress(&PullProgress {
             stage: "error".into(),
             message: msg.clone(),
@@ -373,28 +452,28 @@ pub fn start_container(config: &SandboxConfig) -> Result<String, String> {
     let name = config.container_name();
     let ports = SandboxPorts::default();
 
-    println!(
+    info!(
         "[deck-docker] Starting sandbox container '{}' with image '{}'",
         name, image
     );
 
     if is_container_running(name) {
-        println!("[deck-docker] Existing container found, stopping...");
+        info!("[deck-docker] Existing container found, stopping...");
         let _ = stop_container(Some(name));
     }
 
-    println!(
+    info!(
         "[deck-docker] Removing any stopped container with name '{}'",
         name
     );
-    let _ = Command::new("docker").args(["rm", "-f", name]).output();
+    let _ = docker_cmd().args(["rm", "-f", name]).output();
 
-    println!(
+    info!(
         "[deck-docker] Running docker run with ports: opencode={}, vnc={}, novnc={}, daemon={}, ssh={}, web_terminal={}",
         ports.opencode, ports.vnc, ports.novnc, ports.daemon, ports.ssh, ports.web_terminal
     );
 
-    let output = Command::new("docker")
+    let output = docker_cmd()
         .args([
             "run",
             "--platform",
@@ -440,13 +519,13 @@ pub fn start_container(config: &SandboxConfig) -> Result<String, String> {
         .output()
         .map_err(|e| {
             let msg = format!("Failed to start container: {}", e);
-            eprintln!("[deck-docker] {}", msg);
+            error!("[deck-docker] {}", msg);
             msg
         })?;
 
     if output.status.success() {
         let container_id = String::from_utf8_lossy(&output.stdout).trim().to_string();
-        println!(
+        info!(
             "[deck-docker] Container started successfully, ID: {}",
             container_id
         );
@@ -454,49 +533,49 @@ pub fn start_container(config: &SandboxConfig) -> Result<String, String> {
     } else {
         let stderr = String::from_utf8_lossy(&output.stderr).to_string();
         let msg = format!("Failed to start container: {}", stderr);
-        eprintln!("[deck-docker] {}", msg);
+        error!("[deck-docker] {}", msg);
         Err(msg)
     }
 }
 
 pub fn stop_container(name: Option<&str>) -> Result<String, String> {
     let container_name = name.unwrap_or(DEFAULT_CONTAINER_NAME);
-    println!("[deck-docker] Stopping container '{}'...", container_name);
+    info!("[deck-docker] Stopping container '{}'...", container_name);
 
-    let stop_output = Command::new("docker")
+    let stop_output = docker_cmd()
         .args(["stop", container_name])
         .output()
         .map_err(|e| {
             let msg = format!("Failed to stop container: {}", e);
-            eprintln!("[deck-docker] {}", msg);
+            error!("[deck-docker] {}", msg);
             msg
         })?;
 
     if !stop_output.status.success() {
         let stderr = String::from_utf8_lossy(&stop_output.stderr).to_string();
         let msg = format!("Failed to stop container: {}", stderr);
-        eprintln!("[deck-docker] {}", msg);
+        error!("[deck-docker] {}", msg);
         return Err(msg);
     }
 
-    println!("[deck-docker] Container stopped, removing...");
+    info!("[deck-docker] Container stopped, removing...");
 
-    let rm_output = Command::new("docker")
+    let rm_output = docker_cmd()
         .args(["rm", container_name])
         .output()
         .map_err(|e| {
             let msg = format!("Failed to remove container: {}", e);
-            eprintln!("[deck-docker] {}", msg);
+            error!("[deck-docker] {}", msg);
             msg
         })?;
 
     if rm_output.status.success() {
         let msg = format!("Container {} stopped and removed", container_name);
-        println!("[deck-docker] {}", msg);
+        info!("[deck-docker] {}", msg);
         Ok(msg)
     } else {
         let msg = format!("Container {} stopped (removal warning)", container_name);
-        println!("[deck-docker] {}", msg);
+        warn!("[deck-docker] {}", msg);
         Ok(msg)
     }
 }

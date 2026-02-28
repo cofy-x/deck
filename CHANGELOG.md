@@ -9,6 +9,8 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ### Added
 
+- Client backend logging to file (`deck.log`) and stdout for improved diagnostics.
+- "Open Log Directory" button on client error screens for easy troubleshooting.
 - New `apps/landing` React + Vite marketing site with static asset deployment pipeline.
 - Landing Docker packaging assets under `docker/landing/` and `deploy/landing/docker-compose.yml`.
 - Landing deployment runbook at `docs/design/landing-deploy.md`.
@@ -25,6 +27,7 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ### Fixed
 
+- Client Docker binary detection is now more robust, searching common install paths to avoid `PATH` issues in GUI environments.
 - Default sandbox Docker image name corrected from `deck/desktop-sandbox-ai:latest` to `ghcr.io/cofy-x/deck/desktop-sandbox-ai:latest`.
 
 ## [0.0.1-alpha.3] - 2026-02-26

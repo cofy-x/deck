@@ -1,3 +1,4 @@
+use log::{error, info};
 use reqwest::Url;
 
 #[derive(serde::Deserialize, Debug)]
@@ -15,10 +16,10 @@ pub struct ApiLogEntry {
 
 pub fn print_summary(entry: &ApiLogEntry) {
     if entry.error.is_some() {
-        eprintln!("{}", format_summary_line(entry));
+        error!("{}", format_summary_line(entry));
         return;
     }
-    println!("{}", format_summary_line(entry));
+    info!("{}", format_summary_line(entry));
 }
 
 fn format_summary_line(entry: &ApiLogEntry) -> String {

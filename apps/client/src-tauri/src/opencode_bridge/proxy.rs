@@ -1,5 +1,6 @@
 use std::sync::Arc;
 
+use log::debug;
 use reqwest::header::{HeaderValue, AUTHORIZATION};
 use reqwest::{Method, StatusCode};
 use serde_json::json;
@@ -60,7 +61,7 @@ async fn handle_http_request(
     builder = builder.headers(headers);
 
     if should_log_bridge_target(&request.target) {
-        eprintln!(
+        debug!(
             "[opencode-bridge] request profile={} method={} target={} upstream={} directoryHeader={}",
             context.profile_id,
             method,
@@ -121,7 +122,7 @@ async fn handle_upgrade_request(
         context.forced_directory.as_deref(),
     )?;
     if should_log_bridge_target(&request.target) {
-        eprintln!(
+        debug!(
             "[opencode-bridge] upgrade profile={} method={} target={} upstream={} directoryHeader={}",
             context.profile_id,
             request.method,

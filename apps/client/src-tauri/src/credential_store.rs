@@ -2,6 +2,7 @@ use std::fs;
 use std::path::PathBuf;
 use std::sync::Mutex;
 
+use log::info;
 use rusqlite::Connection;
 use serde::{Deserialize, Serialize};
 use tauri::Manager;
@@ -70,7 +71,7 @@ impl CredentialStore {
         )
         .map_err(|e| format!("failed to initialise credential store schema: {e}"))?;
 
-        println!(
+        info!(
             "[deck-credential-store] Initialised at {}",
             db_path.display()
         );

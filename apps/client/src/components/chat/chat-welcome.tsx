@@ -6,13 +6,25 @@
 import type { ComponentType } from 'react';
 import {
   AlertTriangle,
+  FolderOpen,
   Loader2,
   MessageSquare,
   Play,
   Settings,
 } from 'lucide-react';
+import { invoke } from '@tauri-apps/api/core';
+import { revealItemInDir } from '@tauri-apps/plugin-opener';
 import { Button } from '@/components/ui/button';
 import { t } from '@/i18n';
+
+async function openLogDirectory() {
+  try {
+    const logDir = await invoke<string>('get_app_log_dir');
+    await revealItemInDir(logDir);
+  } catch (err) {
+    console.error('[chat-welcome] Failed to open log directory:', err);
+  }
+}
 
 interface WelcomePrimaryAction {
   label: string;
@@ -149,6 +161,14 @@ export function ChatWelcome({
                   {errorContent.hint}
                 </p>
               )}
+              <button
+                type="button"
+                className="mt-1.5 inline-flex items-center gap-1 text-xs underline opacity-70 hover:opacity-100"
+                onClick={() => void openLogDirectory()}
+              >
+                <FolderOpen className="h-3 w-3" />
+                {t('sandbox.open_log_dir')}
+              </button>
             </div>
           </div>
         </div>
