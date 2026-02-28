@@ -19,7 +19,7 @@ use pilot_runtime::{
     pilot_runtime_health, pilot_runtime_start, pilot_runtime_status, pilot_runtime_stop,
     PilotRuntimeManager,
 };
-use log::{error, info};
+use log::{debug, error, info, warn};
 use tauri::Emitter;
 
 use std::sync::Arc;
@@ -79,7 +79,21 @@ fn log_sse_trace_entry(
 
 #[tauri::command]
 fn get_sse_trace_log_path(app: tauri::AppHandle) -> Result<String, String> {
-    sse_trace::get_log_path(&app)
+    sse_trace::get_log_dir(&app)
+}
+
+// ---------------------------------------------------------------------------
+// Frontend log bridge (production front-end log capture)
+// ---------------------------------------------------------------------------
+
+#[tauri::command]
+fn log_frontend_message(level: String, tag: String, message: String) {
+    match level.as_str() {
+        "error" => error!("[deck-fe:{}] {}", tag, message),
+        "warn" => warn!("[deck-fe:{}] {}", tag, message),
+        "debug" => debug!("[deck-fe:{}] {}", tag, message),
+        _ => info!("[deck-fe:{}] {}", tag, message),
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -228,6 +242,7 @@ pub fn run() {
             log_api_call,
             log_sse_trace_entry,
             get_sse_trace_log_path,
+            log_frontend_message,
             start_opencode_web_bridge,
             stop_opencode_web_bridge,
             pilot_runtime_start,

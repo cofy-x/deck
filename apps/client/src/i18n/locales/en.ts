@@ -430,14 +430,18 @@ export const en: Record<string, string> = {
   // ---------------------------------------------------------------------------
   // Log viewer
   // ---------------------------------------------------------------------------
-  'log.title': 'API Log',
+  'log.title': 'Log',
+  'log.filter.api': 'API',
+  'log.filter.sse': 'SSE',
+  'log.filter.error': 'Error',
+  'log.filter.system': 'System',
   'log.pause': 'Pause',
   'log.resume': 'Resume',
   'log.pause_logging': 'Pause logging',
   'log.resume_logging': 'Resume logging',
   'log.clear': 'Clear',
   'log.clear_log': 'Clear log',
-  'log.no_entries': 'No API requests logged yet.',
+  'log.no_entries': 'No log entries yet.',
   'log.pinned': 'Pinned',
   'log.live': 'Live',
   'log.latest': 'Latest',

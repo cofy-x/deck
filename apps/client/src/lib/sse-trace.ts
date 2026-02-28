@@ -7,6 +7,7 @@ import { invoke } from '@tauri-apps/api/core';
 
 import { isTauriRuntime } from '@/lib/utils';
 import { useDebugStore } from '@/stores/debug-store';
+import type { LogCategory } from '@/stores/debug-store';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -14,10 +15,12 @@ import { useDebugStore } from '@/stores/debug-store';
 
 export interface SseTraceParams {
   url: string;
+  sessionId?: string;
   summary?: string;
   requestBody?: string;
   responseBody?: string;
   error?: string;
+  category?: LogCategory;
 }
 
 // ---------------------------------------------------------------------------
@@ -37,12 +40,15 @@ export function resetTraceState(): void {
 // Tauri file trace
 // ---------------------------------------------------------------------------
 
-function appendTraceEntry(params: SseTraceParams & { timestamp: number }) {
+function appendTraceEntry(
+  params: SseTraceParams & { timestamp: number },
+) {
   if (!isTauriRuntime()) return;
   void invoke('log_sse_trace_entry', {
     entry: {
       timestamp: params.timestamp,
       url: params.url,
+      sessionId: params.sessionId,
       summary: params.summary,
       requestBody: params.requestBody,
       responseBody: params.responseBody,
@@ -85,11 +91,13 @@ export function pushSseDebugEntry(params: SseTraceParams): void {
   if (!store.enabled || store.paused) return;
 
   const timestamp = Date.now();
+  const category: LogCategory = params.category ?? 'sse';
   entryCounter += 1;
   store.addEntry({
     id: `sse-${timestamp}-${entryCounter}`,
     timestamp,
     method: 'SSE',
+    category,
     url: params.url,
     summary: params.summary,
     requestBody: params.requestBody,
@@ -108,8 +116,9 @@ export function pushSseDebugEntry(params: SseTraceParams): void {
         id: `sse-${Date.now()}-${entryCounter}`,
         timestamp: Date.now(),
         method: 'SSE',
+        category: 'system',
         url: '/event',
-        summary: 'trace.file',
+        summary: 'trace.dir',
         responseBody: path,
       });
     });

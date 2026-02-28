@@ -29,7 +29,6 @@ interface SseEventDigest {
 
 const SSE_LOGGABLE_TYPES = new Set<string>([
   'message.updated',
-  'message.part.updated',
   'session.status',
   'session.idle',
   'session.compacted',
