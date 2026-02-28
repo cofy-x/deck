@@ -9,6 +9,12 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ### Added
 
+- Enhanced client log viewer with category filters and per-session tracing for easier debugging.
+
+## [0.0.1-alpha.3.2] - 2026-02-28
+
+### Added
+
 - Client backend logging to file (`deck.log`) and stdout for improved diagnostics.
 - "Open Log Directory" button on client error screens for easy troubleshooting.
 - New `apps/landing` React + Vite marketing site with static asset deployment pipeline.

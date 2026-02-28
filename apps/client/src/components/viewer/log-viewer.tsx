@@ -23,9 +23,9 @@ import {
   CollapsibleContent,
   CollapsibleTrigger,
 } from '@/components/ui/collapsible';
-import { useDebugStore } from '@/stores/debug-store';
+import { useDebugStore, ALL_LOG_CATEGORIES } from '@/stores/debug-store';
 import { useViewerStore } from '@/stores/viewer-store';
-import type { DebugLogEntry } from '@/stores/debug-store';
+import type { DebugLogEntry, LogCategory } from '@/stores/debug-store';
 import { cn } from '@/lib/utils';
 
 // ---------------------------------------------------------------------------
@@ -84,6 +84,13 @@ function shortenUrl(url: string): string {
 function copyToClipboard(text: string) {
   void navigator.clipboard.writeText(text);
 }
+
+const CATEGORY_I18N: Record<LogCategory, string> = {
+  api: 'log.filter.api',
+  sse: 'log.filter.sse',
+  error: 'log.filter.error',
+  system: 'log.filter.system',
+};
 
 // ---------------------------------------------------------------------------
 // Inline copy button
@@ -299,29 +306,30 @@ function LogEntryItem({
 export function LogViewer() {
   const entries = useDebugStore((s) => s.entries);
   const pinnedIds = useDebugStore((s) => s.pinnedIds);
+  const activeFilters = useDebugStore((s) => s.activeFilters);
   const paused = useDebugStore((s) => s.paused);
   const setPaused = useDebugStore((s) => s.setPaused);
   const togglePin = useDebugStore((s) => s.togglePin);
+  const toggleFilter = useDebugStore((s) => s.toggleFilter);
   const clearEntries = useDebugStore((s) => s.clearEntries);
   const openContent = useViewerStore((s) => s.openContent);
   const scrollRef = useRef<HTMLDivElement>(null);
   const [autoScroll, setAutoScroll] = useState(true);
 
-  // Keep pinned and live entries in separate buckets to avoid reordering churn.
   const { pinnedEntries, liveEntries } = useMemo(() => {
     const pinned: DebugLogEntry[] = [];
     const unpinned: DebugLogEntry[] = [];
     for (const entry of entries) {
+      const visible = activeFilters.has(entry.category);
       if (pinnedIds.has(entry.id)) {
         pinned.push(entry);
-      } else {
+      } else if (visible) {
         unpinned.push(entry);
       }
     }
     return { pinnedEntries: pinned, liveEntries: unpinned };
-  }, [entries, pinnedIds]);
+  }, [entries, pinnedIds, activeFilters]);
 
-  // Auto-scroll only tracks the live stream growth, not pin/unpin changes.
   useEffect(() => {
     if (autoScroll && !paused && scrollRef.current) {
       scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
@@ -364,43 +372,64 @@ export function LogViewer() {
   return (
     <div className="relative flex h-full flex-col">
       {/* Toolbar */}
-      <div className="flex h-10 shrink-0 items-center justify-between border-b px-3">
-        <div className="flex items-center gap-2">
-          <span className="text-sm font-medium">{t('log.title')}</span>
-          <Badge variant="secondary" className="text-[10px]">
-            {entries.length}
-          </Badge>
-          {paused && (
-            <Badge variant="outline" className="text-[10px] text-yellow-500">
-              {t('common.paused')}
+      <div className="flex shrink-0 flex-col border-b">
+        <div className="flex h-10 items-center justify-between px-3">
+          <div className="flex items-center gap-2">
+            <span className="text-sm font-medium">{t('log.title')}</span>
+            <Badge variant="secondary" className="text-[10px]">
+              {entries.length}
             </Badge>
-          )}
-        </div>
-        <div className="flex items-center gap-1">
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => setPaused(!paused)}
-            className="h-7 gap-1 px-2 text-xs"
-            title={paused ? t('log.resume_logging') : t('log.pause_logging')}
-          >
-            {paused ? (
-              <Play className="h-3 w-3" />
-            ) : (
-              <Pause className="h-3 w-3" />
+            {paused && (
+              <Badge variant="outline" className="text-[10px] text-yellow-500">
+                {t('common.paused')}
+              </Badge>
             )}
-            {paused ? t('log.resume') : t('log.pause')}
-          </Button>
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={clearEntries}
-            className="h-7 gap-1 px-2 text-xs"
-            title={t('log.clear_log')}
-          >
-            <Trash2 className="h-3 w-3" />
-            {t('log.clear')}
-          </Button>
+          </div>
+          <div className="flex items-center gap-1">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setPaused(!paused)}
+              className="h-7 gap-1 px-2 text-xs"
+              title={paused ? t('log.resume_logging') : t('log.pause_logging')}
+            >
+              {paused ? (
+                <Play className="h-3 w-3" />
+              ) : (
+                <Pause className="h-3 w-3" />
+              )}
+              {paused ? t('log.resume') : t('log.pause')}
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={clearEntries}
+              className="h-7 gap-1 px-2 text-xs"
+              title={t('log.clear_log')}
+            >
+              <Trash2 className="h-3 w-3" />
+              {t('log.clear')}
+            </Button>
+          </div>
+        </div>
+
+        {/* Category filters */}
+        <div className="flex items-center gap-1 px-3 pb-1.5">
+          {ALL_LOG_CATEGORIES.map((cat) => (
+            <button
+              key={cat}
+              type="button"
+              onClick={() => toggleFilter(cat)}
+              className={cn(
+                'rounded-full px-2 py-0.5 text-[10px] font-medium transition-colors',
+                activeFilters.has(cat)
+                  ? 'bg-primary/10 text-primary'
+                  : 'bg-muted/50 text-muted-foreground/60',
+              )}
+            >
+              {t(CATEGORY_I18N[cat])}
+            </button>
+          ))}
         </div>
       </div>
 

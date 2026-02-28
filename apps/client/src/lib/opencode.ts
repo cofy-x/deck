@@ -13,7 +13,7 @@ import { invoke } from '@tauri-apps/api/core';
 import { isTauriRuntime } from './utils';
 import { LOCAL_OPENCODE_BASE_URL } from './constants';
 import { useDebugStore } from '@/stores/debug-store';
-import type { DebugLogEntry } from '@/stores/debug-store';
+import type { DebugLogEntry, LogCategory } from '@/stores/debug-store';
 
 // ---------------------------------------------------------------------------
 // API call logging (dev diagnostics via Tauri backend console)
@@ -38,7 +38,6 @@ export interface CreateClientInput {
   onUnauthorized?: (context: UnauthorizedContext) => void;
 }
 
-const IS_DEV = import.meta.env.DEV;
 const UNAUTHORIZED_STATUS_CODES = new Set([401, 403]);
 
 export interface UnauthorizedContext {
@@ -53,7 +52,7 @@ export interface UnauthorizedContext {
  * Errors are swallowed to avoid interfering with the actual request.
  */
 function logApiCall(entry: ApiLogEntry) {
-  if (!IS_DEV || !isTauriRuntime()) return;
+  if (!isTauriRuntime()) return;
   invoke('log_api_call', { entry }).catch(() => {
     // Silently ignore logging errors
   });
@@ -156,11 +155,21 @@ function sanitizeLogBody(text: string): string {
   );
 }
 
+const POLLING_PATH_PATTERNS = [/\/health$/, /\/event$/];
+
+function resolveApiCategory(url: string, status?: number, error?: string): LogCategory {
+  if (error || (status !== undefined && status >= 400)) return 'error';
+  try {
+    const path = new URL(url).pathname;
+    if (POLLING_PATH_PATTERNS.some((re) => re.test(path))) return 'system';
+  } catch {
+    // non-absolute URL, skip
+  }
+  return 'api';
+}
+
 let debugEntryCounter = 0;
 
-/**
- * Push an entry to the in-memory debug log store (if debug mode is enabled).
- */
 function pushDebugEntry(partial: Omit<DebugLogEntry, 'id' | 'timestamp'>) {
   const store = useDebugStore.getState();
   if (!store.enabled) return;
@@ -272,13 +281,13 @@ function createTauriFetch(
         }),
       );
 
-      // Push to debug log (full body)
       const debugResponseBody = skipBodyLogging
         ? '[stream omitted]'
         : await extractResponseFull(response, url);
       pushDebugEntry({
         method,
         url,
+        category: resolveApiCategory(url, response.status),
         status: response.status,
         durationMs,
         requestBody: bodyPreview,
@@ -301,6 +310,7 @@ function createTauriFetch(
       pushDebugEntry({
         method,
         url,
+        category: 'error',
         requestBody: bodyPreview,
         durationMs,
         error: errorMsg,
@@ -352,6 +362,7 @@ function createDebugFetch(
       pushDebugEntry({
         method,
         url,
+        category: resolveApiCategory(url, response.status),
         requestBody: bodyPreview,
         status: response.status,
         durationMs,
@@ -363,6 +374,7 @@ function createDebugFetch(
       pushDebugEntry({
         method,
         url,
+        category: 'error',
         requestBody: bodyPreview,
         durationMs,
         error: err instanceof Error ? err.message : String(err),

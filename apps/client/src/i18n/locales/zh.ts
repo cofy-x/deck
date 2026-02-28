@@ -411,14 +411,18 @@ export const zh: Record<string, string> = {
   // ---------------------------------------------------------------------------
   // Log viewer
   // ---------------------------------------------------------------------------
-  'log.title': 'API 日志',
+  'log.title': '日志',
+  'log.filter.api': 'API',
+  'log.filter.sse': 'SSE',
+  'log.filter.error': '错误',
+  'log.filter.system': '系统',
   'log.pause': '暂停',
   'log.resume': '继续',
   'log.pause_logging': '暂停日志记录',
   'log.resume_logging': '继续日志记录',
   'log.clear': '清除',
   'log.clear_log': '清除日志',
-  'log.no_entries': '暂无 API 请求记录。',
+  'log.no_entries': '暂无日志记录。',
   'log.pinned': '已固定',
   'log.live': '实时',
   'log.latest': '最新',

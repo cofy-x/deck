@@ -10,11 +10,21 @@ import { persist } from 'zustand/middleware';
 // Types
 // ---------------------------------------------------------------------------
 
+export type LogCategory = 'api' | 'sse' | 'error' | 'system';
+
+export const ALL_LOG_CATEGORIES: LogCategory[] = [
+  'api',
+  'sse',
+  'error',
+  'system',
+];
+
 export interface DebugLogEntry {
   id: string;
   timestamp: number;
   method: string;
   url: string;
+  category: LogCategory;
   /** One-line summary shown in collapsed list rows. */
   summary?: string;
   requestBody?: string;
@@ -33,6 +43,8 @@ interface DebugState {
   entries: DebugLogEntry[];
   /** IDs of pinned entries (pinned entries appear at the top). */
   pinnedIds: Set<string>;
+  /** Active category filters (only entries matching a filter are shown). */
+  activeFilters: Set<LogCategory>;
 }
 
 interface DebugActions {
@@ -40,6 +52,7 @@ interface DebugActions {
   setPaused: (paused: boolean) => void;
   addEntry: (entry: DebugLogEntry) => void;
   togglePin: (id: string) => void;
+  toggleFilter: (category: LogCategory) => void;
   clearEntries: () => void;
   reset: () => void;
 }
@@ -49,7 +62,7 @@ interface DebugActions {
 // ---------------------------------------------------------------------------
 
 /** Maximum number of entries to keep in memory. */
-const MAX_ENTRIES = 100;
+const MAX_ENTRIES = 200;
 
 // ---------------------------------------------------------------------------
 // Store
@@ -60,6 +73,7 @@ const initialState: DebugState = {
   paused: false,
   entries: [],
   pinnedIds: new Set(),
+  activeFilters: new Set(ALL_LOG_CATEGORIES),
 };
 
 export const useDebugStore = create<DebugState & DebugActions>()(
@@ -71,7 +85,6 @@ export const useDebugStore = create<DebugState & DebugActions>()(
       addEntry: (entry) =>
         set((state) => {
           if (!state.enabled || state.paused) return state;
-          // Append the new entry, keep pinned entries, prune excess
           const updated = [...state.entries, entry].slice(-MAX_ENTRIES);
           return { entries: updated };
         }),
@@ -85,12 +98,21 @@ export const useDebugStore = create<DebugState & DebugActions>()(
           }
           return { pinnedIds: next };
         }),
+      toggleFilter: (category) =>
+        set((state) => {
+          const next = new Set(state.activeFilters);
+          if (next.has(category)) {
+            next.delete(category);
+          } else {
+            next.add(category);
+          }
+          return { activeFilters: next };
+        }),
       clearEntries: () => set({ entries: [], pinnedIds: new Set() }),
       reset: () => set(initialState),
     }),
     {
       name: 'deck-debug-settings',
-      // Only persist the `enabled` flag, not the entries or paused state
       partialize: (state) => ({ enabled: state.enabled }),
     },
   ),

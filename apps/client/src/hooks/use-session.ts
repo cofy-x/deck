@@ -736,6 +736,7 @@ export function useEventSubscription(
           });
           pushSseDebugEntry({
             url: '/event',
+            sessionId: sessionId ?? undefined,
             summary: 'subscribe.start',
             requestBody: JSON.stringify({
               action: 'subscribe.start',
@@ -749,6 +750,7 @@ export function useEventSubscription(
           console.info('[SSE] Stream connected');
           pushSseDebugEntry({
             url: '/event',
+            sessionId: sessionId ?? undefined,
             summary: 'subscribe.connected',
             responseBody: JSON.stringify({
               action: 'subscribe.connected',
@@ -761,8 +763,10 @@ export function useEventSubscription(
             if (shouldLogSseEvent(event)) {
               pushSseDebugEntry({
                 url: '/event',
+                sessionId: sessionId ?? undefined,
                 summary: summarizeSseEventCompact(event),
                 responseBody: summarizeSseEventJson(event),
+                category: event.type === 'session.error' ? 'error' : 'sse',
               });
             }
             handleEvent(event);
@@ -772,8 +776,10 @@ export function useEventSubscription(
             console.warn('[SSE] Stream error, will reconnect:', error);
             pushSseDebugEntry({
               url: '/event',
+              sessionId: sessionId ?? undefined,
               summary: 'stream.error',
               error: error instanceof Error ? error.message : String(error),
+              category: 'error',
             });
           }
         }
@@ -839,6 +845,7 @@ export function useEventSubscription(
     ) => {
       pushSseDebugEntry({
         url: '/event',
+        sessionId: targetSessionId,
         summary: `message.part.delta buffered part=${partId} reason=${reasons.join(',')}`,
         responseBody: JSON.stringify({
           type: 'message.part.delta.buffered',
@@ -873,6 +880,7 @@ export function useEventSubscription(
       }
       pushSseDebugEntry({
         url: '/event',
+        sessionId: targetSessionId,
         summary: `message.part.delta replayed part=${partId} applied=${pending.length - remaining.length} remaining=${remaining.length}`,
         responseBody: JSON.stringify({
           type: 'message.part.delta.replayed',
@@ -1069,6 +1077,7 @@ export function useEventSubscription(
           const targetSessionId = event.properties.sessionID;
           pushSseTraceOnlyEntry({
             url: '/event',
+            sessionId: targetSessionId ?? sessionId ?? undefined,
             summary: summarizeSseEventCompact(event),
             responseBody: summarizeSseEventJson(event),
           });
@@ -1309,6 +1318,7 @@ export function useEventSubscription(
       console.info('[SSE] Unsubscribing from event stream');
       pushSseDebugEntry({
         url: '/event',
+        sessionId: sessionId ?? undefined,
         summary: 'subscribe.stopped',
         responseBody: JSON.stringify({
           action: 'subscribe.stopped',
