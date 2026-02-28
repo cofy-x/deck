@@ -7,6 +7,7 @@ import { useCallback, useEffect, useRef } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { invoke } from '@tauri-apps/api/core';
 import { listen, type UnlistenFn } from '@tauri-apps/api/event';
+import { toast } from 'sonner';
 
 import { useActiveConnection } from '@/hooks/use-connection';
 import { CONFIG_KEYS } from '@/hooks/use-config';
@@ -44,6 +45,7 @@ interface SandboxStatus {
 interface DockerInfo {
   available: boolean;
   error: string | null;
+  resolved_path: string | null;
 }
 
 interface SandboxConfig {
@@ -234,10 +236,12 @@ export function useSandboxStatus() {
   const isContainerRunning = query.data?.running;
 
   // Sync local docker state into the shared UI status.
+  // Preserve error state — only a new user action (start/stop) should clear it.
   useEffect(() => {
     if (!isLocal || isMutating || isContainerRunning === undefined) return;
-    const serverStatus: SandboxStatusValue = isContainerRunning ? 'running' : 'idle';
     const currentStatus = useSandboxStore.getState().status;
+    if (currentStatus === 'error') return;
+    const serverStatus: SandboxStatusValue = isContainerRunning ? 'running' : 'idle';
     if (serverStatus !== currentStatus) {
       useSandboxStore.getState().setStatus(serverStatus);
     }
@@ -296,6 +300,8 @@ export function useSandboxState(): SandboxStatusValue {
     return status;
   }
 
+  if (status === 'error') return 'error';
+
   if (!data) return 'checking';
   return data.running ? 'running' : 'idle';
 }
@@ -340,6 +346,7 @@ export function useConnectRemote() {
       const message =
         error instanceof Error ? error.message : 'Failed to connect remote';
       useSandboxStore.getState().setError(message);
+      toast.error('Remote connection failed', { description: message });
     },
   });
 }
@@ -369,6 +376,7 @@ export function useDisconnectRemote() {
       const message =
         error instanceof Error ? error.message : 'Failed to disconnect remote';
       useSandboxStore.getState().setError(message);
+      toast.error('Remote disconnect failed', { description: message });
     },
   });
 }
@@ -454,6 +462,7 @@ export function useStartSandbox() {
       const message =
         error instanceof Error ? error.message : 'Failed to start sandbox';
       useSandboxStore.getState().setError(message);
+      toast.error('Sandbox failed to start', { description: message });
     },
     onSettled: () => {
       if (unlistenRef.current) {
@@ -498,6 +507,7 @@ export function useStopSandbox() {
       const message =
         error instanceof Error ? error.message : 'Failed to stop sandbox';
       useSandboxStore.getState().setError(message);
+      toast.error('Sandbox failed to stop', { description: message });
     },
   });
 }

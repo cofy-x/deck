@@ -6,6 +6,7 @@ mod routing;
 
 use std::sync::Arc;
 
+use log::info;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 use tauri::{AppHandle, Emitter, State};
@@ -171,7 +172,7 @@ pub async fn start_bridge(
         }),
     );
 
-    eprintln!(
+    info!(
         "[opencode-bridge] started profile={} port={} upstream={} directoryHeader={}",
         info.profile_id,
         info.port,

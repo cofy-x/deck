@@ -325,6 +325,7 @@ export const zh: Record<string, string> = {
     '请在左侧 Chat 中点击“连接远程”，或使用右上角状态控制。',
   'sandbox.retry_from_chat_hint':
     '请在左侧 Chat 中重试，或使用右上角状态控制。',
+  'sandbox.open_log_dir': '打开日志目录',
   'sandbox.start_sandbox': '启动沙盒',
   'sandbox.connect_remote': '连接远程',
   'sandbox.boot_failed': '桌面启动失败',

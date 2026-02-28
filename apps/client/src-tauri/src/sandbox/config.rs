@@ -63,6 +63,7 @@ pub struct SandboxStatus {
 pub struct DockerInfo {
     pub available: bool,
     pub error: Option<String>,
+    pub resolved_path: Option<String>,
 }
 
 pub const DEFAULT_CONTAINER_NAME: &str = CONTAINER_NAME;

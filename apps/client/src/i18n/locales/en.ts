@@ -341,6 +341,7 @@ export const en: Record<string, string> = {
     'Use Connect Remote in Chat (left), or use the status control in the top-right.',
   'sandbox.retry_from_chat_hint':
     'Retry from Chat (left), or use the status control in the top-right.',
+  'sandbox.open_log_dir': 'Open Log Directory',
   'sandbox.start_sandbox': 'Start Sandbox',
   'sandbox.connect_remote': 'Connect Remote',
   'sandbox.boot_failed': 'Desktop Boot Failed',
