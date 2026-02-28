@@ -3,9 +3,10 @@
  * Copyright 2026 cofy-x
  * SPDX-License-Identifier: Apache-2.0
  */
-import { useEffect, useRef } from 'react';
+import { useCallback, useEffect, useRef } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { invoke } from '@tauri-apps/api/core';
+import { listen, type UnlistenFn } from '@tauri-apps/api/event';
 
 import { useActiveConnection } from '@/hooks/use-connection';
 import { CONFIG_KEYS } from '@/hooks/use-config';
@@ -48,6 +49,14 @@ interface DockerInfo {
 interface SandboxConfig {
   image?: string;
   container_name?: string;
+}
+
+interface PullProgress {
+  stage: string;
+  message: string;
+  percent: number;
+  layers_done: number;
+  layers_total: number;
 }
 
 // ---------------------------------------------------------------------------
@@ -371,12 +380,30 @@ export function useStartSandbox() {
   const qc = useQueryClient();
   const { profile, scope, isRemote, endpoints, secrets } =
     useActiveConnection();
+  const unlistenRef = useRef<UnlistenFn | null>(null);
 
   return useMutation({
     onMutate: async () => {
       useSandboxStore.getState().setStatus(isRemote ? 'connecting' : 'pulling');
       useSandboxStore.getState().setMutating(true);
+      useSandboxStore.getState().clearPullProgress();
       await qc.cancelQueries({ queryKey: SANDBOX_KEYS.status(scope) });
+
+      if (!isRemote) {
+        try {
+          unlistenRef.current = await listen<PullProgress>(
+            'sandbox-pull-progress',
+            (event) => {
+              const { percent, message, layers_done, layers_total } = event.payload;
+              const store = useSandboxStore.getState();
+              store.setPullProgress(percent, message, layers_done, layers_total);
+              store.updatePullLog(message);
+            },
+          );
+        } catch (err) {
+          console.warn('[useStartSandbox] Failed to listen for pull progress:', err);
+        }
+      }
     },
     mutationFn: async (config?: SandboxConfig) => {
       if (isRemote) {
@@ -428,6 +455,13 @@ export function useStartSandbox() {
         error instanceof Error ? error.message : 'Failed to start sandbox';
       useSandboxStore.getState().setError(message);
     },
+    onSettled: () => {
+      if (unlistenRef.current) {
+        unlistenRef.current();
+        unlistenRef.current = null;
+      }
+      useSandboxStore.getState().clearPullProgress();
+    },
   });
 }
 
@@ -466,4 +500,13 @@ export function useStopSandbox() {
       useSandboxStore.getState().setError(message);
     },
   });
+}
+
+/**
+ * Cancel an in-progress sandbox start (image pull).
+ */
+export function useCancelSandboxStart() {
+  return useCallback(() => {
+    void invoke('cancel_sandbox_start');
+  }, []);
 }

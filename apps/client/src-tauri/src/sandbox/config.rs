@@ -1,6 +1,6 @@
 use serde::{Deserialize, Serialize};
 
-const DEFAULT_IMAGE: &str = "deck/desktop-sandbox-ai:latest";
+const DEFAULT_IMAGE: &str = "ghcr.io/cofy-x/deck/desktop-sandbox-ai:latest";
 const CONTAINER_NAME: &str = "deck-desktop-sandbox-ai";
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

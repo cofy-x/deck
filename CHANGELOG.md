@@ -14,10 +14,18 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 - Landing deployment runbook at `docs/design/landing-deploy.md`.
 - GitHub Actions workflow for building Deck landing image and optionally publishing to GHCR.
 - GitHub Actions workflow for deploying `apps/landing/dist` to Cloudflare Pages.
+- Client sandbox image pull progress streaming with per-layer status tracking and weighted progress bar.
+- Cancel button for in-progress sandbox image pulls (Desktop placeholder and top-right dropdown).
+- Pull log viewer in Viewer tab showing real-time layer status updates during image pull.
+- "View Logs" guide link in Desktop placeholder to redirect users to the Viewer during pulls.
 
 ### Changed
 
 - Landing locale fallback now defaults to English unless a user-selected locale exists in local storage.
+
+### Fixed
+
+- Default sandbox Docker image name corrected from `deck/desktop-sandbox-ai:latest` to `ghcr.io/cofy-x/deck/desktop-sandbox-ai:latest`.
 
 ## [0.0.1-alpha.3] - 2026-02-26
 

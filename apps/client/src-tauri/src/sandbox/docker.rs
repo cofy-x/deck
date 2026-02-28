@@ -1,6 +1,104 @@
-use std::process::Command;
+use std::collections::HashMap;
+use std::io::{BufRead, BufReader};
+use std::process::{Command, Stdio};
+use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
+use std::sync::Arc;
+
+use serde::Serialize;
 
 use super::config::{DockerInfo, SandboxConfig, SandboxPorts, DEFAULT_CONTAINER_NAME};
+
+// ---------------------------------------------------------------------------
+// Pull cancellation token
+// ---------------------------------------------------------------------------
+
+#[derive(Debug, Default)]
+pub struct PullCancelToken {
+    cancelled: AtomicBool,
+    child_pid: AtomicU32,
+}
+
+impl PullCancelToken {
+    pub fn cancel(&self) {
+        self.cancelled.store(true, Ordering::SeqCst);
+        let pid = self.child_pid.load(Ordering::SeqCst);
+        if pid != 0 {
+            let _ = Command::new("kill").arg(pid.to_string()).output();
+        }
+    }
+
+    pub fn reset(&self) {
+        self.cancelled.store(false, Ordering::SeqCst);
+        self.child_pid.store(0, Ordering::SeqCst);
+    }
+
+    fn is_cancelled(&self) -> bool {
+        self.cancelled.load(Ordering::SeqCst)
+    }
+
+    fn set_child_pid(&self, pid: u32) {
+        self.child_pid.store(pid, Ordering::SeqCst);
+    }
+}
+
+pub type SharedPullCancelToken = Arc<PullCancelToken>;
+
+// ---------------------------------------------------------------------------
+// Pull progress types
+// ---------------------------------------------------------------------------
+
+#[derive(Debug, Clone, Serialize)]
+pub struct PullProgress {
+    pub stage: String,
+    pub message: String,
+    pub percent: u8,
+    pub layers_done: u32,
+    pub layers_total: u32,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+enum LayerState {
+    Waiting,
+    Downloading,
+    Extracting,
+    Complete,
+}
+
+fn layer_state_from_status(status: &str) -> LayerState {
+    let s = status.trim().to_lowercase();
+    if s.starts_with("pull complete") || s.starts_with("already exists") {
+        LayerState::Complete
+    } else if s.starts_with("extracting") || s.starts_with("verifying") {
+        LayerState::Extracting
+    } else if s.starts_with("downloading") || s.starts_with("download complete") {
+        LayerState::Downloading
+    } else {
+        LayerState::Waiting
+    }
+}
+
+fn compute_pull_progress(layers: &HashMap<String, LayerState>) -> (u32, u32, u8) {
+    if layers.is_empty() {
+        return (0, 0, 0);
+    }
+    let total = layers.len() as u32;
+    let done = layers
+        .values()
+        .filter(|s| **s == LayerState::Complete)
+        .count() as u32;
+
+    let weighted: u32 = layers
+        .values()
+        .map(|s| match s {
+            LayerState::Waiting => 0u32,
+            LayerState::Downloading => 33,
+            LayerState::Extracting => 66,
+            LayerState::Complete => 100,
+        })
+        .sum();
+    let percent = (weighted / total).min(100) as u8;
+    (done, total, percent)
+}
 
 fn parse_exact_container_id_from_ps_output(output: &str, expected_name: &str) -> Option<String> {
     output
@@ -128,25 +226,144 @@ mod tests {
     }
 }
 
-pub fn pull_image(image: &str) -> Result<String, String> {
+pub fn pull_image_with_progress<F>(
+    image: &str,
+    cancel_token: &PullCancelToken,
+    on_progress: F,
+) -> Result<String, String>
+where
+    F: Fn(&PullProgress),
+{
     println!("[deck-docker] Pulling image: {}...", image);
-    let output = Command::new("docker")
+    cancel_token.reset();
+
+    on_progress(&PullProgress {
+        stage: "pulling".into(),
+        message: format!("Pulling {}...", image),
+        percent: 0,
+        layers_done: 0,
+        layers_total: 0,
+    });
+
+    let mut child = Command::new("docker")
         .args(["pull", image])
-        .output()
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()
         .map_err(|e| {
             let msg = format!("Failed to execute docker pull: {}", e);
             eprintln!("[deck-docker] {}", msg);
             msg
         })?;
 
-    if output.status.success() {
+    cancel_token.set_child_pid(child.id());
+
+    let stdout = child.stdout.take();
+    let stderr = child.stderr.take();
+
+    let mut layers: HashMap<String, LayerState> = HashMap::new();
+
+    if let Some(out) = stdout {
+        let reader = BufReader::new(out);
+        for line in reader.lines() {
+            if cancel_token.is_cancelled() {
+                println!("[deck-docker] Pull cancelled by user");
+                let _ = child.kill();
+                let _ = child.wait();
+                return Err("Pull cancelled".to_string());
+            }
+
+            let line = match line {
+                Ok(l) => l,
+                Err(_) => continue,
+            };
+            let trimmed = line.trim();
+            if trimmed.is_empty() {
+                continue;
+            }
+            println!("[deck-docker] {}", trimmed);
+
+            if let Some((layer_id, status)) = trimmed.split_once(':') {
+                let layer_id = layer_id.trim();
+                let status_text = status.trim();
+                if !layer_id.is_empty()
+                    && layer_id.len() <= 12
+                    && layer_id.chars().all(|c| c.is_ascii_hexdigit())
+                {
+                    let state = layer_state_from_status(status_text);
+                    layers.insert(layer_id.to_string(), state);
+
+                    let (done, total, percent) = compute_pull_progress(&layers);
+                    on_progress(&PullProgress {
+                        stage: "pulling".into(),
+                        message: format!("{}: {}", layer_id, status_text),
+                        percent,
+                        layers_done: done,
+                        layers_total: total,
+                    });
+                    continue;
+                }
+            }
+
+            let (done, total, percent) = compute_pull_progress(&layers);
+            on_progress(&PullProgress {
+                stage: "pulling".into(),
+                message: trimmed.to_string(),
+                percent,
+                layers_done: done,
+                layers_total: total,
+            });
+        }
+    }
+
+    cancel_token.set_child_pid(0);
+
+    if cancel_token.is_cancelled() {
+        let _ = child.kill();
+        let _ = child.wait();
+        return Err("Pull cancelled".to_string());
+    }
+
+    let status = child.wait().map_err(|e| {
+        let msg = format!("Failed to wait for docker pull: {}", e);
+        eprintln!("[deck-docker] {}", msg);
+        msg
+    })?;
+
+    if status.success() {
         let msg = format!("Successfully pulled {}", image);
         println!("[deck-docker] {}", msg);
+        on_progress(&PullProgress {
+            stage: "complete".into(),
+            message: msg.clone(),
+            percent: 100,
+            layers_done: layers.len() as u32,
+            layers_total: layers.len() as u32,
+        });
         Ok(msg)
     } else {
-        let stderr = String::from_utf8_lossy(&output.stderr).to_string();
-        let msg = format!("Failed to pull {}: {}", image, stderr);
+        if cancel_token.is_cancelled() {
+            return Err("Pull cancelled".to_string());
+        }
+        let mut err_output = String::new();
+        if let Some(err) = stderr {
+            let reader = BufReader::new(err);
+            for line in reader.lines().map_while(Result::ok) {
+                if !err_output.is_empty() {
+                    err_output.push('\n');
+                }
+                err_output.push_str(&line);
+            }
+        }
+        let msg = format!("Failed to pull {}: {}", image, err_output);
         eprintln!("[deck-docker] {}", msg);
+        on_progress(&PullProgress {
+            stage: "error".into(),
+            message: msg.clone(),
+            percent: 0,
+            layers_done: 0,
+            layers_total: 0,
+        });
         Err(msg)
     }
 }

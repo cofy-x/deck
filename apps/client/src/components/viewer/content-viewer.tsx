@@ -8,9 +8,11 @@ import { FileQuestion } from 'lucide-react';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { MarkdownRenderer } from '@/components/chat/markdown-renderer';
 import { DiffViewer } from './diff-viewer';
+import { PullLogViewer } from './pull-log-viewer';
 import { ViewerToolbar } from './viewer-toolbar';
 import { highlightCode } from '@/lib/shiki';
 import { useViewerStore } from '@/stores/viewer-store';
+import { useSandboxStore } from '@/stores/sandbox-store';
 import { t } from '@/i18n';
 
 // ---------------------------------------------------------------------------
@@ -93,6 +95,8 @@ function EmptyViewer() {
 
 export function ContentViewer() {
   const content = useViewerStore((s) => s.content);
+  const sandboxStatus = useSandboxStore((s) => s.status);
+  const isPulling = sandboxStatus === 'pulling';
 
   // Plaintext "code" content is better rendered as markdown for wrapping
   const isPlaintextCode =
@@ -100,6 +104,10 @@ export function ContentViewer() {
     (!content.language ||
       content.language === 'plaintext' ||
       content.language === 'text');
+
+  if (isPulling) {
+    return <PullLogViewer />;
+  }
 
   return (
     <div className="flex h-full flex-col">

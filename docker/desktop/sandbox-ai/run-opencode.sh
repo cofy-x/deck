@@ -2,7 +2,7 @@
 set -euo pipefail
 
 CONTAINER_NAME="${CONTAINER_NAME:-deck-desktop-sandbox-ai-remote}"
-IMAGE_NAME="${IMAGE_NAME:-deck/desktop-sandbox-ai:latest}"
+IMAGE_NAME="${IMAGE_NAME:-ghcr.io/cofy-x/deck/desktop-sandbox-ai:latest}"
 
 HOST_OPENCODE_PORT="${HOST_OPENCODE_PORT:-14096}"
 HOST_VNC_PORT="${HOST_VNC_PORT:-15901}"

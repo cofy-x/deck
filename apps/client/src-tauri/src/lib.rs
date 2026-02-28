@@ -19,7 +19,11 @@ use pilot_runtime::{
     pilot_runtime_health, pilot_runtime_start, pilot_runtime_status, pilot_runtime_stop,
     PilotRuntimeManager,
 };
-use sandbox::{DockerInfo, SandboxConfig, SandboxStatus};
+use tauri::Emitter;
+
+use std::sync::Arc;
+
+use sandbox::{DockerInfo, PullCancelToken, SandboxConfig, SandboxStatus};
 
 // ---------------------------------------------------------------------------
 // API logging (dev mode diagnostics)
@@ -80,17 +84,24 @@ fn get_sandbox_status() -> SandboxStatus {
 }
 
 #[tauri::command]
-async fn start_sandbox(config: Option<SandboxConfig>) -> Result<String, String> {
+async fn start_sandbox(
+    app: tauri::AppHandle,
+    state: tauri::State<'_, sandbox::SharedPullCancelToken>,
+    config: Option<SandboxConfig>,
+) -> Result<String, String> {
     println!("[deck] Command: start_sandbox, config: {:?}", config);
     let cfg = config.unwrap_or_default();
     let image = cfg.image().to_string();
+    let token = Arc::clone(&state);
 
     tokio::task::spawn_blocking(move || {
         println!("[deck] Step 1: Checking image {}...", image);
 
         if !sandbox::image_exists(&image) {
             println!("[deck] Image not found, pulling...");
-            match sandbox::pull_image(&image) {
+            match sandbox::pull_image_with_progress(&image, &token, |progress| {
+                let _ = app.emit("sandbox-pull-progress", progress);
+            }) {
                 Ok(msg) => println!("[deck] Pull result: {}", msg),
                 Err(msg) => return Err(format!("Failed to pull image: {}", msg)),
             }
@@ -107,6 +118,12 @@ async fn start_sandbox(config: Option<SandboxConfig>) -> Result<String, String> 
         eprintln!("[deck] {}", msg);
         msg
     })?
+}
+
+#[tauri::command]
+fn cancel_sandbox_start(state: tauri::State<'_, sandbox::SharedPullCancelToken>) {
+    println!("[deck] Command: cancel_sandbox_start");
+    state.cancel();
 }
 
 #[tauri::command]
@@ -138,11 +155,13 @@ pub fn run() {
         })
         .manage(OpencodeBridgeManager::default())
         .manage(PilotRuntimeManager::default())
+        .manage(Arc::new(PullCancelToken::default()) as sandbox::SharedPullCancelToken)
         .invoke_handler(tauri::generate_handler![
             check_docker,
             get_sandbox_status,
             start_sandbox,
             stop_sandbox,
+            cancel_sandbox_start,
             log_api_call,
             log_sse_trace_entry,
             get_sse_trace_log_path,
