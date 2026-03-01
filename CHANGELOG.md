@@ -18,10 +18,12 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 - Updated local sandbox container lifecycle: `Stop Sandbox` now stops the container without removing it, and subsequent starts reuse existing containers.
 - Updated project picker local fallback root to `/home/deck/workspace` to align with persistent local workspace defaults.
+- Refactored `apps/client` sandbox Docker backend into focused Rust modules (`command`, `probe`, `storage`, `pull`, `lifecycle`) to improve maintainability.
 
 ### Fixed
 
 - Pinned client release tag creation to the resolved build commit SHA in release workflows to keep published source tags aligned with built DMG artifacts.
+- Hardened sandbox stop behavior to propagate Docker probe failures instead of reporting false "not found" stop success.
 
 ## [0.0.1-alpha.3.2] - 2026-02-28
 
