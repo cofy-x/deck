@@ -187,10 +187,14 @@ jobs:
         run: |
           set -euo pipefail
           checksum_file="$RUNNER_TEMP/deck-client-${VERSION}-UNSIGNED-SHA256SUMS.txt"
-          shasum -a 256 \
+          : > "$checksum_file"
+          for dmg_file in \
             apps/client/src-tauri/target/release/bundle/dmg/*.dmg \
-            apps/client/src-tauri/target/x86_64-apple-darwin/release/bundle/dmg/*.dmg \
-            > "$checksum_file"
+            apps/client/src-tauri/target/x86_64-apple-darwin/release/bundle/dmg/*.dmg; do
+            printf "%s  %s\n" \
+              "$(shasum -a 256 "$dmg_file" | awk '{ print $1 }')" \
+              "$(basename "$dmg_file")" >> "$checksum_file"
+          done
           echo "CHECKSUM_FILE=$checksum_file" >> "$GITHUB_ENV"
           cat "$checksum_file"
 
