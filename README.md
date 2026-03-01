@@ -21,7 +21,7 @@
 
 > [!NOTE]
 > Deck is currently in **prerelease** (`v0.0.1`).
-> macOS builds may be unsigned / not notarized. See [install notes](#3-first-launch-on-macos) if Gatekeeper blocks the app.
+> macOS builds may be unsigned / not notarized. See [install notes](#2-first-launch-on-macos) if Gatekeeper blocks the app.
 
 ---
 

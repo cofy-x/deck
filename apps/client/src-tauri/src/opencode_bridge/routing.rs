@@ -192,9 +192,7 @@ fn sanitize_directory_query(
             directory
         );
     } else {
-        warn!(
-            "[opencode-bridge] dropped corrupted query directory value without forced directory"
-        );
+        warn!("[opencode-bridge] dropped corrupted query directory value without forced directory");
     }
 
     url.set_query(None);

@@ -193,6 +193,17 @@ export const zh: Record<string, string> = {
   'connection.placeholder_username': 'opencode',
   'connection.placeholder_password': '••••••••',
   'connection.placeholder_optional': '可选',
+  'connection.storage_title': '本地沙盒存储',
+  'connection.storage_description':
+    '本地沙盒的持久化数据保存在磁盘上，重启沙盒后会继续复用。',
+  'connection.storage_path': '存储路径',
+  'connection.storage_size': '存储大小',
+  'connection.storage_reset': '重置本地沙盒数据',
+  'connection.storage_reset_confirm':
+    '该操作将停止并删除本地沙盒容器，同时清空所有持久化沙盒数据。是否继续？',
+  'connection.storage_reset_success': '本地沙盒数据已重置。',
+  'connection.storage_legacy_warning':
+    '检测到旧版本地沙盒容器。请重置存储以迁移到持久化挂载模式。',
 
   // ---------------------------------------------------------------------------
   // Remote connection dialog

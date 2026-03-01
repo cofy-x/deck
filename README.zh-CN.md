@@ -21,7 +21,7 @@
 
 > [!NOTE]
 > Deck 目前处于 **预发布** 阶段（`v0.0.1`）。
-> macOS 构建可能未签名/未公证。如果 Gatekeeper 阻止启动，请参阅[安装说明](#3-macos-首次启动)。
+> macOS 构建可能未签名/未公证。如果 Gatekeeper 阻止启动，请参阅[安装说明](#2-macos-首次启动)。
 
 ---
 
@@ -65,6 +65,21 @@ open /Applications/deck.app
 > ```bash
 > docker pull ghcr.io/cofy-x/deck/desktop-sandbox-ai:latest
 > ```
+
+### 4. 本地沙盒数据持久化
+
+`apps/client` 的本地沙盒默认启用磁盘持久化，并在 Stop/Start 之间复用同一个容器：
+
+- `Stop Sandbox`：仅停止容器，不删除容器与数据。
+- `Start Sandbox`：优先复用已存在容器；不存在时创建新容器。
+- `Reset Local Sandbox Data`：显式删除容器并清空本地持久化数据。
+
+默认挂载目录（宿主机）：
+
+- `<app_data_dir>/sandbox/local/workspace` -> `/home/deck/workspace`
+- `<app_data_dir>/sandbox/local/deck-state` -> `/home/deck/.deck`
+- `<app_data_dir>/sandbox/local/opencode-share` -> `/home/deck/.local/share/opencode`
+- `<app_data_dir>/sandbox/local/opencode-state` -> `/home/deck/.local/state/opencode`
 
 ---
 

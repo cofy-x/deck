@@ -29,8 +29,8 @@ import {
 // Constants
 // ---------------------------------------------------------------------------
 
-/** Base directory to list projects from inside the sandbox. */
-const SANDBOX_HOME = '/home/deck';
+/** Preferred fallback root directory inside the local sandbox. */
+const LOCAL_SANDBOX_WORKSPACE = '/home/deck/workspace';
 
 // ---------------------------------------------------------------------------
 // Component
@@ -48,8 +48,9 @@ export function ProjectPickerDialog() {
     useState<ProjectDirectoryItem | null>(null);
   const { data: paths } = usePaths();
 
-  // Keep root dynamic to match OpenCode server environment.
-  const rootDirectory = paths?.home ?? SANDBOX_HOME;
+  // Keep the picker rooted to a stable base path.
+  // Prefer user home, then fall back to the local persistent workspace path.
+  const rootDirectory = paths?.home || LOCAL_SANDBOX_WORKSPACE;
 
   const { data: matchedDirectories = [], isLoading: isFindingDirectories } =
     useFindDirectories(rootDirectory, search);

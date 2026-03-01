@@ -11,6 +11,7 @@ use credential_store::{
     init_credential_store, list_credentials, list_custom_providers, remove_credential,
     remove_custom_provider, save_credential, save_custom_provider,
 };
+use log::{debug, error, info, warn};
 use opencode_bridge::{
     start_bridge, stop_bridge, OpencodeBridgeManager, StartOpencodeWebBridgeInput,
     StopOpencodeWebBridgeInput,
@@ -19,25 +20,32 @@ use pilot_runtime::{
     pilot_runtime_health, pilot_runtime_start, pilot_runtime_status, pilot_runtime_stop,
     PilotRuntimeManager,
 };
-use log::{debug, error, info, warn};
 use tauri::Emitter;
 
 use std::sync::Arc;
 
-use sandbox::{DockerInfo, PullCancelToken, SandboxConfig, SandboxStatus};
+use sandbox::{DockerInfo, PullCancelToken, SandboxConfig, SandboxStatus, SandboxStorageInfo};
 
 fn log_startup_diagnostics() {
-    info!("[deck] OS: {} / {}", std::env::consts::OS, std::env::consts::ARCH);
-    info!("[deck] Executable: {:?}", std::env::current_exe().unwrap_or_default());
-    info!("[deck] CWD: {:?}", std::env::current_dir().unwrap_or_default());
+    info!(
+        "[deck] OS: {} / {}",
+        std::env::consts::OS,
+        std::env::consts::ARCH
+    );
+    info!(
+        "[deck] Executable: {:?}",
+        std::env::current_exe().unwrap_or_default()
+    );
+    info!(
+        "[deck] CWD: {:?}",
+        std::env::current_dir().unwrap_or_default()
+    );
     info!("[deck] PATH: {}", std::env::var("PATH").unwrap_or_default());
 
     let docker = sandbox::check_docker_available();
     info!(
         "[deck] Docker: available={} path={:?} error={:?}",
-        docker.available,
-        docker.resolved_path,
-        docker.error
+        docker.available, docker.resolved_path, docker.error
     );
 }
 
@@ -133,6 +141,20 @@ fn get_sandbox_status() -> SandboxStatus {
 }
 
 #[tauri::command]
+fn get_sandbox_storage_info(
+    app: tauri::AppHandle,
+    config: Option<SandboxConfig>,
+) -> Result<SandboxStorageInfo, String> {
+    let cfg = config.unwrap_or_default();
+    let app_data_dir = app
+        .path()
+        .app_data_dir()
+        .map_err(|error| format!("Failed to resolve app data dir: {error}"))?;
+    let storage_root = sandbox::resolve_storage_root(&app_data_dir, &cfg);
+    Ok(sandbox::sandbox_storage_info(None, &storage_root))
+}
+
+#[tauri::command]
 async fn start_sandbox(
     app: tauri::AppHandle,
     state: tauri::State<'_, sandbox::SharedPullCancelToken>,
@@ -141,6 +163,11 @@ async fn start_sandbox(
     info!("[deck] Command: start_sandbox, config: {:?}", config);
     let cfg = config.unwrap_or_default();
     let image = cfg.image().to_string();
+    let app_data_dir = app
+        .path()
+        .app_data_dir()
+        .map_err(|error| format!("Failed to resolve app data dir: {error}"))?;
+    let storage_root = sandbox::resolve_storage_root(&app_data_dir, &cfg);
     let token = Arc::clone(&state);
 
     tokio::task::spawn_blocking(move || {
@@ -159,7 +186,7 @@ async fn start_sandbox(
         }
 
         info!("[deck] Step 2: Starting container...");
-        sandbox::start_container(&cfg)
+        sandbox::start_container(&cfg, &storage_root)
     })
     .await
     .map_err(|e| {
@@ -187,6 +214,30 @@ async fn stop_sandbox() -> Result<String, String> {
         })?
 }
 
+#[tauri::command]
+async fn reset_sandbox_storage(
+    app: tauri::AppHandle,
+    config: Option<SandboxConfig>,
+) -> Result<String, String> {
+    info!("[deck] Command: reset_sandbox_storage");
+    let cfg = config.unwrap_or_default();
+    let app_data_dir = app
+        .path()
+        .app_data_dir()
+        .map_err(|error| format!("Failed to resolve app data dir: {error}"))?;
+    let storage_root = sandbox::resolve_storage_root(&app_data_dir, &cfg);
+    let container_name = cfg.container_name().to_string();
+    tokio::task::spawn_blocking(move || {
+        sandbox::reset_sandbox(Some(&container_name), &storage_root)
+    })
+    .await
+    .map_err(|e| {
+        let msg = format!("Task join error: {}", e);
+        error!("[deck] {}", msg);
+        msg
+    })?
+}
+
 // ---------------------------------------------------------------------------
 // Application log path command
 // ---------------------------------------------------------------------------
@@ -203,7 +254,9 @@ fn get_app_log_dir(app: tauri::AppHandle) -> Result<String, String> {
 pub fn run() {
     let log_plugin = tauri_plugin_log::Builder::new()
         .target(tauri_plugin_log::Target::new(
-            tauri_plugin_log::TargetKind::LogDir { file_name: Some("deck".into()) },
+            tauri_plugin_log::TargetKind::LogDir {
+                file_name: Some("deck".into()),
+            },
         ))
         .target(tauri_plugin_log::Target::new(
             tauri_plugin_log::TargetKind::Stdout,
@@ -224,8 +277,7 @@ pub fn run() {
             install_panic_hook();
             info!("[deck] Starting Deck application...");
             log_startup_diagnostics();
-            let store = init_credential_store(app)
-                .expect("failed to initialise credential store");
+            let store = init_credential_store(app).expect("failed to initialise credential store");
             app.manage(store);
             Ok(())
         })
@@ -235,8 +287,10 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             check_docker,
             get_sandbox_status,
+            get_sandbox_storage_info,
             start_sandbox,
             stop_sandbox,
+            reset_sandbox_storage,
             cancel_sandbox_start,
             get_app_log_dir,
             log_api_call,

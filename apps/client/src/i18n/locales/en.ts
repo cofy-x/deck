@@ -202,6 +202,17 @@ export const en: Record<string, string> = {
   'connection.placeholder_username': 'opencode',
   'connection.placeholder_password': '••••••••',
   'connection.placeholder_optional': 'Optional',
+  'connection.storage_title': 'Local Sandbox Storage',
+  'connection.storage_description':
+    'Persistent data is stored on your disk and reused across local sandbox restarts.',
+  'connection.storage_path': 'Storage Path',
+  'connection.storage_size': 'Storage Size',
+  'connection.storage_reset': 'Reset Local Sandbox Data',
+  'connection.storage_reset_confirm':
+    'This will stop and remove the local sandbox container and delete all persisted sandbox data. Continue?',
+  'connection.storage_reset_success': 'Local sandbox data has been reset.',
+  'connection.storage_legacy_warning':
+    'A legacy local sandbox container was detected. Reset storage to migrate to persistent mounts.',
 
   // ---------------------------------------------------------------------------
   // Remote connection dialog

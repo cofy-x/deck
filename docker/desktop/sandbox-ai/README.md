@@ -89,3 +89,22 @@ The sandbox provides a managed environment for modern development and AI workflo
 | **Input**   | `/mouse/click`, `/keyboard/type`  | Human-like input simulation for UI automation.       |
 | **Visuals** | `/screenshot/compressed`          | Efficient screen capture for AI processing.          |
 | **Debug**   | `/process/:name/logs`             | Real-time log retrieval for managed PIDs.            |
+
+---
+
+## Desktop Client Persistence Notes
+
+When this image is launched by `apps/client` local mode, the desktop app mounts persistent host directories (under Tauri `app_data_dir`) into the container instead of relying on writable container layers.
+
+Default mount layout:
+
+- `<app_data_dir>/sandbox/local/workspace` -> `/home/deck/workspace`
+- `<app_data_dir>/sandbox/local/deck-state` -> `/home/deck/.deck`
+- `<app_data_dir>/sandbox/local/opencode-share` -> `/home/deck/.local/share/opencode`
+- `<app_data_dir>/sandbox/local/opencode-state` -> `/home/deck/.local/state/opencode`
+
+Operational behavior in local mode:
+
+- `Stop Sandbox` stops the container but does not remove it.
+- The next start reuses the existing container when mount layout is compatible.
+- A dedicated reset action removes the container and deletes persisted storage.

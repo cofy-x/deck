@@ -43,8 +43,12 @@ impl CredentialStore {
             .map_err(|e| format!("failed to create app data dir: {e}"))?;
 
         let db_path = app_data_dir.join("credentials.db");
-        let conn = Connection::open(&db_path)
-            .map_err(|e| format!("failed to open credentials db at {}: {e}", db_path.display()))?;
+        let conn = Connection::open(&db_path).map_err(|e| {
+            format!(
+                "failed to open credentials db at {}: {e}",
+                db_path.display()
+            )
+        })?;
 
         conn.execute_batch(
             "
@@ -142,10 +146,7 @@ impl CredentialStore {
     pub fn remove_credential(&self, profile_id: &str, provider_id: &str) -> Result<(), String> {
         self.execute(
             "DELETE FROM provider_credentials WHERE profile_id = ?1 AND provider_id = ?2",
-            &[
-                &profile_id as &dyn rusqlite::types::ToSql,
-                &provider_id,
-            ],
+            &[&profile_id as &dyn rusqlite::types::ToSql, &provider_id],
         )
     }
 
@@ -194,10 +195,7 @@ impl CredentialStore {
     ) -> Result<(), String> {
         self.execute(
             "DELETE FROM custom_providers WHERE profile_id = ?1 AND provider_id = ?2",
-            &[
-                &profile_id as &dyn rusqlite::types::ToSql,
-                &provider_id,
-            ],
+            &[&profile_id as &dyn rusqlite::types::ToSql, &provider_id],
         )
     }
 }
