@@ -36,13 +36,21 @@ fn dir_size_bytes(path: &Path) -> u64 {
     let mut total = 0u64;
     for entry in entries.flatten() {
         let entry_path = entry.path();
-        let metadata = match entry.metadata() {
+        let metadata = match fs::symlink_metadata(&entry_path) {
             Ok(metadata) => metadata,
             Err(_) => continue,
         };
-        if metadata.is_dir() {
+        let file_type = metadata.file_type();
+
+        // Never follow symlinks while walking storage usage. This keeps the
+        // traversal bounded to the configured storage root and avoids loops.
+        if file_type.is_symlink() {
+            continue;
+        }
+
+        if file_type.is_dir() {
             total = total.saturating_add(dir_size_bytes(&entry_path));
-        } else if metadata.is_file() {
+        } else if file_type.is_file() {
             total = total.saturating_add(metadata.len());
         }
     }
@@ -86,5 +94,60 @@ pub fn sandbox_storage_info(name: Option<&str>, root_dir: &Path) -> SandboxStora
         size_bytes,
         available,
         legacy_container_detected,
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::dir_size_bytes;
+    use std::fs;
+    use std::path::PathBuf;
+    use std::time::{SystemTime, UNIX_EPOCH};
+
+    fn test_dir(name: &str) -> PathBuf {
+        let unique = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .expect("system time should be after UNIX_EPOCH")
+            .as_nanos();
+        let dir = std::env::temp_dir().join(format!("deck-storage-{name}-{unique}"));
+        fs::create_dir_all(&dir).expect("test dir should be created");
+        dir
+    }
+
+    #[test]
+    fn dir_size_bytes_counts_regular_files_recursively() {
+        let root = test_dir("recursive");
+        let nested = root.join("nested");
+        fs::create_dir_all(&nested).expect("nested dir should be created");
+        fs::write(root.join("a.bin"), vec![1u8; 3]).expect("root file should be written");
+        fs::write(nested.join("b.bin"), vec![1u8; 7]).expect("nested file should be written");
+
+        let size = dir_size_bytes(&root);
+        assert_eq!(size, 10);
+
+        fs::remove_dir_all(root).expect("test dir should be removed");
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn dir_size_bytes_skips_symlinked_directories() {
+        use std::os::unix::fs::symlink;
+
+        let root = test_dir("symlink");
+        let real = root.join("real");
+        fs::create_dir_all(&real).expect("real dir should be created");
+        fs::write(real.join("keep.bin"), vec![1u8; 5]).expect("real file should be written");
+
+        let outside = test_dir("outside");
+        fs::write(outside.join("skip.bin"), vec![1u8; 11]).expect("outside file should be written");
+
+        symlink(&outside, root.join("outside-link")).expect("symlink should be created");
+        symlink(&root, root.join("loop-link")).expect("loop symlink should be created");
+
+        let size = dir_size_bytes(&root);
+        assert_eq!(size, 5);
+
+        fs::remove_dir_all(root).expect("test dir should be removed");
+        fs::remove_dir_all(outside).expect("outside dir should be removed");
     }
 }
