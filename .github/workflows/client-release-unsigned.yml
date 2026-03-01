@@ -1,0 +1,245 @@
+name: Client Release (Unsigned)
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: Release version (for example 0.0.1-alpha.5)
+        required: true
+        type: string
+      ref:
+        description: Git ref to release from
+        required: false
+        default: main
+        type: string
+      prerelease:
+        description: Publish as prerelease
+        required: false
+        default: true
+        type: boolean
+      draft:
+        description: Keep release as draft (recommended for unsigned builds)
+        required: false
+        default: true
+        type: boolean
+
+permissions:
+  contents: write
+
+concurrency:
+  group: client-release-unsigned-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  release-client-macos-unsigned:
+    name: Release Client (macOS, unsigned)
+    runs-on: macos-14
+    timeout-minutes: 120
+    env:
+      CI: true
+      VERSION: ${{ inputs.version }}
+      TAG: v${{ inputs.version }}
+      BUILD_RETRY_MAX: 3
+      BUILD_RETRY_DELAY_SECONDS: 60
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: ${{ inputs.ref }}
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10.24.0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+
+      - name: Setup Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Add Rust target (x86_64 macOS)
+        run: rustup target add x86_64-apple-darwin
+
+      - name: Setup Rust cache
+        uses: swatinem/rust-cache@v2
+        with:
+          workspaces: apps/client/src-tauri -> target
+
+      - name: Validate version format
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ ! "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$ ]]; then
+            echo "Invalid version: $VERSION"
+            echo "Expected format: 0.0.1 or 0.0.1-alpha.1"
+            exit 1
+          fi
+
+      - name: Ensure tag does not exist
+        shell: bash
+        run: |
+          set -euo pipefail
+          if git ls-remote --tags origin "refs/tags/${TAG}" | grep -q .; then
+            echo "Tag already exists: ${TAG}"
+            exit 1
+          fi
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build client daemon package
+        run: pnpm --filter @cofy-x/client-daemon build
+
+      - name: Create Tauri release override config
+        shell: bash
+        run: |
+          set -euo pipefail
+          config_path="$RUNNER_TEMP/tauri.release.override.json"
+          cat > "$config_path" <<EOF
+          {
+            "version": "${VERSION}",
+            "bundle": {
+              "externalBin": []
+            }
+          }
+          EOF
+          echo "TAURI_RELEASE_CONFIG=$config_path" >> "$GITHUB_ENV"
+
+      - name: Build DMG (unsigned, arm64)
+        shell: bash
+        run: |
+          set -euo pipefail
+          max_attempts="${BUILD_RETRY_MAX:-3}"
+          delay_seconds="${BUILD_RETRY_DELAY_SECONDS:-60}"
+          attempt=1
+
+          while true; do
+            echo "arm64 build attempt ${attempt}/${max_attempts}"
+            if pnpm --filter @cofy-x/deck-app tauri build --bundles dmg --ci --config "$TAURI_RELEASE_CONFIG"; then
+              break
+            fi
+
+            if [ "$attempt" -ge "$max_attempts" ]; then
+              echo "::error::arm64 build failed after ${max_attempts} attempts."
+              exit 1
+            fi
+
+            echo "Retrying arm64 build in ${delay_seconds}s..."
+            sleep "$delay_seconds"
+            attempt=$((attempt + 1))
+          done
+
+      - name: Build DMG (unsigned, x86_64)
+        shell: bash
+        run: |
+          set -euo pipefail
+          max_attempts="${BUILD_RETRY_MAX:-3}"
+          delay_seconds="${BUILD_RETRY_DELAY_SECONDS:-60}"
+          attempt=1
+
+          while true; do
+            echo "x86_64 build attempt ${attempt}/${max_attempts}"
+            if pnpm --filter @cofy-x/deck-app tauri build --bundles dmg --ci --target x86_64-apple-darwin --config "$TAURI_RELEASE_CONFIG"; then
+              break
+            fi
+
+            if [ "$attempt" -ge "$max_attempts" ]; then
+              echo "::error::x86_64 build failed after ${max_attempts} attempts."
+              exit 1
+            fi
+
+            echo "Retrying x86_64 build in ${delay_seconds}s..."
+            sleep "$delay_seconds"
+            attempt=$((attempt + 1))
+          done
+
+      - name: Verify DMG artifacts exist
+        shell: bash
+        run: |
+          set -euo pipefail
+          shopt -s nullglob
+          arm_dmgs=(apps/client/src-tauri/target/release/bundle/dmg/*.dmg)
+          amd_dmgs=(apps/client/src-tauri/target/x86_64-apple-darwin/release/bundle/dmg/*.dmg)
+          if [ "${#arm_dmgs[@]}" -eq 0 ]; then
+            echo "::error::No arm64 DMG found"
+            exit 1
+          fi
+          if [ "${#amd_dmgs[@]}" -eq 0 ]; then
+            echo "::error::No x86_64 DMG found"
+            exit 1
+          fi
+          echo "arm64: ${arm_dmgs[*]}"
+          echo "x86_64: ${amd_dmgs[*]}"
+
+      - name: Generate SHA256 checksums
+        shell: bash
+        run: |
+          set -euo pipefail
+          checksum_file="$RUNNER_TEMP/deck-client-${VERSION}-UNSIGNED-SHA256SUMS.txt"
+          shasum -a 256 \
+            apps/client/src-tauri/target/release/bundle/dmg/*.dmg \
+            apps/client/src-tauri/target/x86_64-apple-darwin/release/bundle/dmg/*.dmg \
+            > "$checksum_file"
+          echo "CHECKSUM_FILE=$checksum_file" >> "$GITHUB_ENV"
+          cat "$checksum_file"
+
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: deck-client-dmg-${{ inputs.version }}-unsigned
+          path: |
+            apps/client/src-tauri/target/release/bundle/dmg/*.dmg
+            apps/client/src-tauri/target/x86_64-apple-darwin/release/bundle/dmg/*.dmg
+            ${{ env.CHECKSUM_FILE }}
+          retention-days: 14
+          if-no-files-found: error
+
+      - name: Create GitHub release and upload assets
+        id: publish_release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ env.TAG }}
+          target_commitish: ${{ inputs.ref }}
+          draft: ${{ inputs.draft }}
+          prerelease: ${{ inputs.prerelease }}
+          generate_release_notes: true
+          body: |
+            WARNING: UNSIGNED / NOT NOTARIZED (macOS)
+
+            This build is published for testing and rapid delivery only.
+            Gatekeeper warnings are expected because the DMGs are not notarized.
+            Verify checksums before distribution.
+          files: |
+            apps/client/src-tauri/target/release/bundle/dmg/*.dmg
+            apps/client/src-tauri/target/x86_64-apple-darwin/release/bundle/dmg/*.dmg
+            ${{ env.CHECKSUM_FILE }}
+
+      - name: Write release summary
+        shell: bash
+        run: |
+          set -euo pipefail
+          {
+            echo "## Client Release Summary (Unsigned)"
+            echo ""
+            echo "- Version: \`${VERSION}\`"
+            echo "- Tag: \`${TAG}\`"
+            echo "- Ref: \`${{ inputs.ref }}\`"
+            echo "- Draft: \`${{ inputs.draft }}\`"
+            echo "- Prerelease: \`${{ inputs.prerelease }}\`"
+            echo "- Release URL: ${{ steps.publish_release.outputs.url }}"
+            echo "- Notarization: skipped"
+            echo ""
+            echo "### DMG Assets"
+            ls -1 \
+              apps/client/src-tauri/target/release/bundle/dmg/*.dmg \
+              apps/client/src-tauri/target/x86_64-apple-darwin/release/bundle/dmg/*.dmg \
+              | sed 's/^/- /'
+            echo ""
+            echo "### Checksums"
+            sed 's/^/- /' "${CHECKSUM_FILE}"
+          } >> "$GITHUB_STEP_SUMMARY"
