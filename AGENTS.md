@@ -35,3 +35,28 @@ Read the documents in the `.x/` directory in the following order:
 - Follow **Conventional Commits** for commit messages.
 - Reusable logic must live in `packages/`, not duplicated across `apps/`.
 - Verify paths against the actual directory structure before creating files.
+
+## Cursor Cloud specific instructions
+
+### Services overview
+
+| Service | Command | Port | Notes |
+|:---|:---|:---|:---|
+| PostgreSQL + Redis | `docker compose -p deck -f deploy/local/docker-compose.yaml up -d` | 15432, 16379 | Must start Docker daemon first (`sudo dockerd &`) |
+| NestJS API | `pnpm --filter @cofy-x/deck-api run dev` | 3001 | Needs DB+Redis; copy `.env.example` to `.env` and run `db:push` first |
+| Dashboard | `pnpm --filter @cofy-x/deck-dashboard run dev` | 5173 | Vite dev server; depends on API for health checks |
+| Landing | `pnpm --filter @cofy-x/deck-landing run dev` | 5180 | Standalone Vite dev server |
+
+### Common commands
+
+See `Makefile` and `.x/project-overview.md` for the full command reference. Key shortcuts:
+- `make lint` (ESLint + golangci-lint), `make test` (Vitest + Go tests), `make build` (TS + Go).
+- `pnpm run format` for Prettier formatting.
+
+### Cloud VM caveats
+
+- **Docker daemon**: Must be started manually (`sudo dockerd &>/tmp/dockerd.log &`) before running `docker compose`. After install, run `sudo chmod 666 /var/run/docker.sock` to avoid permission issues.
+- **`packages/computer-use` Go tests**: Fail in headless environments because they require X11 libraries (`libxtst-dev`). This is expected; the package is designed to run inside desktop sandbox containers.
+- **`apps/client` (Tauri)**: Cannot be built/run in cloud VMs without a full desktop environment and Tauri system dependencies (webkit2gtk, etc.). Test Tauri-related TS code via `pnpm --filter @cofy-x/deck-app run test`.
+- **API startup sequence**: Before running the API (`pnpm --filter @cofy-x/deck-api run dev`), ensure: (1) Docker dev infra is up, (2) `.env` is copied from `.env.example`, (3) `pnpm --filter @cofy-x/deck-api run db:push` has been run.
+- **pnpm build warnings**: Pilot bin symlink warnings (`Failed to create bin at ...`) are normal before building Pilot TypeScript. Run `pnpm run pilot:build` or `make pilot-build` to resolve.
