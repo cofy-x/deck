@@ -15,6 +15,7 @@ It supports both:
 - Provider/model configuration
 - Multi-profile connection management (local + multiple remotes)
 - Session-only credential handling (not persisted)
+- Local sandbox filesystem persistence across stop/start
 
 ## Run
 
@@ -79,6 +80,7 @@ is loaded through a local Tauri bridge (`127.0.0.1`) instead of directly using t
 ### Local mode
 
 - Top action: `Start Sandbox` / `Stop Sandbox`
+- `Stop Sandbox` stops the container only (no automatic container/data removal)
 - Desktop boot auto-starts computer-use when needed
 - Terminal panel available
 
@@ -89,6 +91,20 @@ is loaded through a local Tauri bridge (`127.0.0.1`) instead of directly using t
 - If computer-use is inactive, user must click **Start Desktop Services**
 - OpenCode fullscreen uses the local bridge when remote Basic Auth is enabled
 - Terminal panel is intentionally disabled in current release
+
+## Local Sandbox Persistence
+
+Local sandbox data is persisted on disk under Tauri `app_data_dir` (default root: `<app_data_dir>/sandbox/local`), with host mounts:
+
+- `<root>/workspace` -> `/home/deck/workspace`
+- `<root>/deck-state` -> `/home/deck/.deck`
+- `<root>/opencode-share` -> `/home/deck/.local/share/opencode`
+- `<root>/opencode-state` -> `/home/deck/.local/state/opencode`
+
+Lifecycle behavior:
+
+- Start reuses a running/stopped compatible container.
+- Settings provides `Reset Local Sandbox Data`, which removes the container and deletes persisted storage.
 
 ## Important Paths
 

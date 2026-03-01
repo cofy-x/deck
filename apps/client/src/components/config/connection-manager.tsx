@@ -4,7 +4,8 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 import { useEffect, useMemo, useState } from 'react';
-import { Plus, Pencil, Trash2, Check } from 'lucide-react';
+import { Plus, Pencil, Trash2, Check, AlertTriangle } from 'lucide-react';
+import { toast } from 'sonner';
 
 import { t } from '@/i18n';
 import { Button } from '@/components/ui/button';
@@ -22,7 +23,12 @@ import {
 } from '@/components/config/remote-connection-dialog';
 import type { RemoteConnectionInput } from '@/lib/connection-validation';
 import { useTransientFlag } from '@/hooks/use-transient-flag';
-import { useSandboxState, useStartSandbox } from '@/hooks/use-sandbox';
+import {
+  useSandboxState,
+  useStartSandbox,
+  useResetSandboxStorage,
+  useSandboxStorageInfo,
+} from '@/hooks/use-sandbox';
 
 const SAVE_FEEDBACK_DURATION_MS = 1500;
 
@@ -31,6 +37,18 @@ type DialogState =
   | { open: true; mode: 'create' | 'edit'; profile?: ConnectionProfile };
 
 const CLOSED_DIALOG: DialogState = { open: false };
+
+function formatBytes(value: number): string {
+  if (value <= 0) return '0 B';
+  const units = ['B', 'KB', 'MB', 'GB', 'TB'];
+  let size = value;
+  let unitIndex = 0;
+  while (size >= 1024 && unitIndex < units.length - 1) {
+    size /= 1024;
+    unitIndex += 1;
+  }
+  return `${size.toFixed(unitIndex === 0 ? 0 : 1)} ${units[unitIndex]}`;
+}
 
 function toFormData(profile: ConnectionProfile): RemoteConnectionFormData {
   return {
@@ -59,6 +77,12 @@ export function ConnectionManager() {
   const [reconnectAfterSave, setReconnectAfterSave] = useState(false);
   const sandboxStatus = useSandboxState();
   const startSandbox = useStartSandbox();
+  const resetSandboxStorage = useResetSandboxStorage();
+  const {
+    data: storageInfo,
+    isLoading: storageInfoLoading,
+    refetch: refetchStorageInfo,
+  } = useSandboxStorageInfo();
   const {
     active: saveFeedbackVisible,
     trigger: triggerSaveFeedback,
@@ -148,6 +172,18 @@ export function ConnectionManager() {
     setPassword('');
     setDaemonToken('');
     clearSaveFeedback();
+  };
+
+  const handleResetLocalSandbox = () => {
+    if (activeProfile.type !== 'local') return;
+    const confirmed = window.confirm(t('connection.storage_reset_confirm'));
+    if (!confirmed) return;
+    resetSandboxStorage.mutate(undefined, {
+      onSuccess: () => {
+        toast.success(t('connection.storage_reset_success'));
+        void refetchStorageInfo();
+      },
+    });
   };
 
   return (
@@ -312,6 +348,61 @@ export function ConnectionManager() {
           </Button>
         </div>
       </div>
+
+      {activeProfile.type === 'local' ? (
+        <div className="flex flex-col gap-3 rounded-md border p-3">
+          <div>
+            <h4 className="text-xs font-medium">{t('connection.storage_title')}</h4>
+            <p className="text-[11px] text-muted-foreground">
+              {t('connection.storage_description')}
+            </p>
+          </div>
+
+          <div className="grid gap-1 text-[11px]">
+            <span className="text-muted-foreground">{t('connection.storage_path')}</span>
+            <code className="rounded bg-muted px-2 py-1 text-[11px]">
+              {storageInfo?.root_dir ?? t('common.loading')}
+            </code>
+          </div>
+
+          <div className="grid gap-1 text-[11px]">
+            <span className="text-muted-foreground">{t('connection.storage_size')}</span>
+            <span className="font-medium">
+              {storageInfoLoading
+                ? t('common.loading')
+                : formatBytes(storageInfo?.size_bytes ?? 0)}
+            </span>
+          </div>
+
+          {storageInfo?.legacy_container_detected ? (
+            <div className="rounded-md border border-amber-500/50 bg-amber-500/10 px-2 py-1.5 text-[11px] text-amber-700 dark:text-amber-300">
+              <div className="flex items-start gap-1.5">
+                <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+                <span>{t('connection.storage_legacy_warning')}</span>
+              </div>
+            </div>
+          ) : null}
+
+          <div className="flex items-center gap-2">
+            <Button
+              size="sm"
+              variant="destructive"
+              onClick={handleResetLocalSandbox}
+              disabled={resetSandboxStorage.isPending}
+            >
+              {t('connection.storage_reset')}
+            </Button>
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => void refetchStorageInfo()}
+              disabled={storageInfoLoading || resetSandboxStorage.isPending}
+            >
+              {t('common.refresh')}
+            </Button>
+          </div>
+        </div>
+      ) : null}
 
       <RemoteConnectionDialog
         open={dialogState.open}

@@ -1,14 +1,30 @@
 use std::collections::HashMap;
+use std::fs;
 use std::io::{BufRead, BufReader};
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
 use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
 use std::sync::Arc;
 
 use log::{debug, error, info, warn};
+use serde::Deserialize;
 use serde::Serialize;
 
-use super::config::{DockerInfo, SandboxConfig, SandboxPorts, DEFAULT_CONTAINER_NAME};
+use super::config::{
+    DockerInfo, SandboxConfig, SandboxPorts, SandboxStorageInfo, DEFAULT_CONTAINER_NAME,
+};
+
+const DEFAULT_STORAGE_ROOT_RELATIVE: &str = "sandbox/local";
+const CONTAINER_WORKSPACE_DIR: &str = "/home/deck/workspace";
+const CONTAINER_DECK_STATE_DIR: &str = "/home/deck/.deck";
+const CONTAINER_OPENCODE_SHARE_DIR: &str = "/home/deck/.local/share/opencode";
+const CONTAINER_OPENCODE_STATE_DIR: &str = "/home/deck/.local/state/opencode";
+const REQUIRED_MOUNT_DESTINATIONS: [&str; 4] = [
+    CONTAINER_WORKSPACE_DIR,
+    CONTAINER_DECK_STATE_DIR,
+    CONTAINER_OPENCODE_SHARE_DIR,
+    CONTAINER_OPENCODE_STATE_DIR,
+];
 
 // ---------------------------------------------------------------------------
 // Docker binary resolution
@@ -35,13 +51,22 @@ fn platform_docker_candidates() -> Vec<String> {
 fn platform_docker_candidates() -> Vec<String> {
     let mut candidates = Vec::new();
     if let Ok(pf) = std::env::var("ProgramFiles") {
-        candidates.push(format!("{}\\Docker\\Docker\\resources\\bin\\docker.exe", pf));
+        candidates.push(format!(
+            "{}\\Docker\\Docker\\resources\\bin\\docker.exe",
+            pf
+        ));
     }
     if let Ok(pf86) = std::env::var("ProgramFiles(x86)") {
-        candidates.push(format!("{}\\Docker\\Docker\\resources\\bin\\docker.exe", pf86));
+        candidates.push(format!(
+            "{}\\Docker\\Docker\\resources\\bin\\docker.exe",
+            pf86
+        ));
     }
     if let Ok(local) = std::env::var("LOCALAPPDATA") {
-        candidates.push(format!("{}\\Docker\\Docker\\resources\\bin\\docker.exe", local));
+        candidates.push(format!(
+            "{}\\Docker\\Docker\\resources\\bin\\docker.exe",
+            local
+        ));
     }
     candidates
 }
@@ -66,6 +91,80 @@ fn docker_cmd() -> Command {
     Command::new(resolve_docker_bin())
 }
 
+#[derive(Debug, Clone)]
+struct SandboxMountPaths {
+    workspace_host: PathBuf,
+    deck_state_host: PathBuf,
+    opencode_share_host: PathBuf,
+    opencode_state_host: PathBuf,
+}
+
+impl SandboxMountPaths {
+    fn from_root(root: &Path) -> Self {
+        Self {
+            workspace_host: root.join("workspace"),
+            deck_state_host: root.join("deck-state"),
+            opencode_share_host: root.join("opencode-share"),
+            opencode_state_host: root.join("opencode-state"),
+        }
+    }
+
+    fn ensure_dirs(&self) -> Result<(), String> {
+        for path in [
+            &self.workspace_host,
+            &self.deck_state_host,
+            &self.opencode_share_host,
+            &self.opencode_state_host,
+        ] {
+            fs::create_dir_all(path).map_err(|error| {
+                format!(
+                    "Failed to prepare sandbox storage at {}: {error}",
+                    path.display()
+                )
+            })?;
+        }
+        Ok(())
+    }
+
+    fn mount_specs(&self) -> Vec<String> {
+        vec![
+            mount_spec(&self.workspace_host, CONTAINER_WORKSPACE_DIR),
+            mount_spec(&self.deck_state_host, CONTAINER_DECK_STATE_DIR),
+            mount_spec(&self.opencode_share_host, CONTAINER_OPENCODE_SHARE_DIR),
+            mount_spec(&self.opencode_state_host, CONTAINER_OPENCODE_STATE_DIR),
+        ]
+    }
+}
+
+#[derive(Debug, Deserialize)]
+struct DockerInspectMount {
+    #[serde(rename = "Destination")]
+    destination: String,
+}
+
+fn mount_spec(source: &Path, target: &str) -> String {
+    format!("type=bind,source={},target={target}", source.display())
+}
+
+pub fn resolve_storage_root(app_data_dir: &Path, config: &SandboxConfig) -> PathBuf {
+    let persistence = config.persistence();
+    if let Some(root) = persistence.root.as_deref() {
+        let trimmed = root.trim();
+        if !trimmed.is_empty() {
+            let candidate = PathBuf::from(trimmed);
+            if candidate.is_absolute() {
+                return candidate;
+            }
+            return app_data_dir.join(candidate);
+        }
+    }
+    app_data_dir.join(DEFAULT_STORAGE_ROOT_RELATIVE)
+}
+
+fn parse_storage_root(root: &Path) -> String {
+    root.display().to_string()
+}
+
 // ---------------------------------------------------------------------------
 // Pull cancellation token
 // ---------------------------------------------------------------------------
@@ -84,7 +183,9 @@ impl PullCancelToken {
             #[cfg(unix)]
             {
                 // SIGTERM for graceful shutdown
-                unsafe { libc::kill(pid as i32, libc::SIGTERM); }
+                unsafe {
+                    libc::kill(pid as i32, libc::SIGTERM);
+                }
             }
             #[cfg(windows)]
             {
@@ -186,9 +287,14 @@ fn parse_exact_container_id_from_ps_output(output: &str, expected_name: &str) ->
         .next()
 }
 
-fn running_container_id_by_exact_name(name: &str) -> Option<String> {
-    let output = docker_cmd()
-        .args(["ps", "--format", "{{.ID}}\t{{.Names}}"])
+fn container_id_by_exact_name(name: &str, all: bool) -> Option<String> {
+    let mut command = docker_cmd();
+    command.arg("ps");
+    if all {
+        command.arg("-a");
+    }
+    let output = command
+        .args(["--format", "{{.ID}}\t{{.Names}}"])
         .output()
         .ok()?;
     if !output.status.success() {
@@ -199,9 +305,43 @@ fn running_container_id_by_exact_name(name: &str) -> Option<String> {
     parse_exact_container_id_from_ps_output(&stdout, name)
 }
 
+fn running_container_id_by_exact_name(name: &str) -> Option<String> {
+    container_id_by_exact_name(name, false)
+}
+
+fn container_exists(name: &str) -> bool {
+    container_id_by_exact_name(name, true).is_some()
+}
+
+fn inspect_container_mount_destinations(name: &str) -> Result<Vec<String>, String> {
+    let output = docker_cmd()
+        .args(["inspect", "--format", "{{json .Mounts}}", name])
+        .output()
+        .map_err(|error| format!("Failed to inspect container mounts: {error}"))?;
+
+    if !output.status.success() {
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        return Err(format!("Failed to inspect container mounts: {stderr}"));
+    }
+
+    let mounts: Vec<DockerInspectMount> = serde_json::from_slice(&output.stdout)
+        .map_err(|error| format!("Failed to parse container mount data: {error}"))?;
+    Ok(mounts.into_iter().map(|mount| mount.destination).collect())
+}
+
+fn container_has_required_mounts(name: &str) -> Result<bool, String> {
+    let destinations = inspect_container_mount_destinations(name)?;
+    Ok(REQUIRED_MOUNT_DESTINATIONS
+        .iter()
+        .all(|required| destinations.iter().any(|dest| dest == required)))
+}
+
 pub fn check_docker_available() -> DockerInfo {
     let resolved = resolve_docker_bin();
-    info!("[deck-docker] Checking Docker availability (binary: {})...", resolved);
+    info!(
+        "[deck-docker] Checking Docker availability (binary: {})...",
+        resolved
+    );
     match Command::new(&resolved).arg("info").output() {
         Ok(output) => {
             if output.status.success() {
@@ -283,6 +423,59 @@ pub fn get_container_status(name: Option<&str>) -> super::config::SandboxStatus 
         },
         container_id,
         ports: SandboxPorts::default(),
+    }
+}
+
+fn dir_size_bytes(path: &Path) -> u64 {
+    let entries = match fs::read_dir(path) {
+        Ok(entries) => entries,
+        Err(_) => return 0,
+    };
+
+    let mut total = 0u64;
+    for entry in entries.flatten() {
+        let entry_path = entry.path();
+        let metadata = match entry.metadata() {
+            Ok(metadata) => metadata,
+            Err(_) => continue,
+        };
+        if metadata.is_dir() {
+            total = total.saturating_add(dir_size_bytes(&entry_path));
+        } else if metadata.is_file() {
+            total = total.saturating_add(metadata.len());
+        }
+    }
+    total
+}
+
+pub fn sandbox_storage_info(name: Option<&str>, root_dir: &Path) -> SandboxStorageInfo {
+    let container_name = name.unwrap_or(DEFAULT_CONTAINER_NAME);
+    let exists = root_dir.exists();
+    let size_bytes = if exists { dir_size_bytes(root_dir) } else { 0 };
+
+    let available = exists || fs::create_dir_all(root_dir).is_ok();
+    let has_container = container_exists(container_name);
+    let legacy_container_detected = if has_container {
+        match container_has_required_mounts(container_name) {
+            Ok(has_required_mounts) => !has_required_mounts,
+            Err(error) => {
+                warn!(
+                    "[deck-docker] Failed to inspect container mounts for '{}': {}",
+                    container_name, error
+                );
+                true
+            }
+        }
+    } else {
+        false
+    };
+
+    SandboxStorageInfo {
+        root_dir: parse_storage_root(root_dir),
+        exists,
+        size_bytes,
+        available,
+        legacy_container_detected,
     }
 }
 
@@ -447,9 +640,10 @@ where
     }
 }
 
-pub fn start_container(config: &SandboxConfig) -> Result<String, String> {
+pub fn start_container(config: &SandboxConfig, storage_root: &Path) -> Result<String, String> {
     let image = config.image();
     let name = config.container_name();
+    let persistence = config.persistence();
     let ports = SandboxPorts::default();
 
     info!(
@@ -457,71 +651,129 @@ pub fn start_container(config: &SandboxConfig) -> Result<String, String> {
         name, image
     );
 
-    if is_container_running(name) {
-        info!("[deck-docker] Existing container found, stopping...");
-        let _ = stop_container(Some(name));
+    let has_container = container_exists(name);
+    if has_container {
+        if persistence.enabled() {
+            match container_has_required_mounts(name) {
+                Ok(true) => {}
+                Ok(false) => {
+                    return Err(
+                        "Existing sandbox container was created without persistent mounts. Please use \"Reset Local Sandbox Data\" in Settings before starting again."
+                            .to_string(),
+                    );
+                }
+                Err(error) => {
+                    return Err(format!(
+                        "Failed to validate existing sandbox container mounts: {}",
+                        error
+                    ));
+                }
+            }
+        }
+
+        if let Some(container_id) = running_container_id_by_exact_name(name) {
+            info!(
+                "[deck-docker] Container '{}' already running (ID: {})",
+                name, container_id
+            );
+            return Ok(container_id);
+        }
+
+        info!(
+            "[deck-docker] Container '{}' exists and is stopped, starting...",
+            name
+        );
+        let start_output = docker_cmd()
+            .args(["start", name])
+            .output()
+            .map_err(|error| format!("Failed to start existing container: {error}"))?;
+        if !start_output.status.success() {
+            let stderr = String::from_utf8_lossy(&start_output.stderr);
+            return Err(format!("Failed to start existing container: {stderr}"));
+        }
+
+        if let Some(container_id) = running_container_id_by_exact_name(name) {
+            return Ok(container_id);
+        }
+        let stdout = String::from_utf8_lossy(&start_output.stdout)
+            .trim()
+            .to_string();
+        if !stdout.is_empty() {
+            return Ok(stdout);
+        }
+        return Err("Container started but ID could not be resolved".to_string());
     }
 
-    info!(
-        "[deck-docker] Removing any stopped container with name '{}'",
-        name
-    );
-    let _ = docker_cmd().args(["rm", "-f", name]).output();
+    let mount_paths = SandboxMountPaths::from_root(storage_root);
+    if persistence.enabled() {
+        mount_paths.ensure_dirs()?;
+    }
 
     info!(
         "[deck-docker] Running docker run with ports: opencode={}, vnc={}, novnc={}, daemon={}, ssh={}, web_terminal={}",
         ports.opencode, ports.vnc, ports.novnc, ports.daemon, ports.ssh, ports.web_terminal
     );
 
-    let output = docker_cmd()
-        .args([
-            "run",
-            "--platform",
-            "linux/amd64",
-            "--name",
-            name,
-            "-d",
-            "-p",
-            &format!("{}:{}", ports.opencode, ports.opencode),
-            "-p",
-            &format!("{}:{}", ports.vnc, ports.vnc),
-            "-p",
-            &format!("{}:{}", ports.novnc, ports.novnc),
-            "-p",
-            &format!("{}:{}", ports.daemon, ports.daemon),
-            "-p",
-            &format!("{}:{}", ports.ssh, ports.ssh),
-            "-p",
-            &format!("{}:{}", ports.web_terminal, ports.web_terminal),
-            "-e",
-            "DISPLAY=:1",
-            "-e",
-            &format!("VNC_PORT={}", ports.vnc),
-            "-e",
-            &format!("NO_VNC_PORT={}", ports.novnc),
-            "-e",
-            "VNC_RESOLUTION=1280x720",
-            "-e",
-            "VNC_USER=deck",
-            "-e",
-            "DECK_LOG_LEVEL=debug",
-            image,
-            "opencode",
-            "serve",
-            "--hostname",
-            "0.0.0.0",
-            "--port",
-            &ports.opencode.to_string(),
-            "--print-logs",
-            "--log-level",
-            "DEBUG",
-        ])
-        .output()
-        .map_err(|e| {
-            let msg = format!("Failed to start container: {}", e);
-            error!("[deck-docker] {}", msg);
-            msg
-        })?;
+    let mut args = vec![
+        "run".to_string(),
+        "--platform".to_string(),
+        "linux/amd64".to_string(),
+        "--name".to_string(),
+        name.to_string(),
+        "-d".to_string(),
+        "-p".to_string(),
+        format!("{}:{}", ports.opencode, ports.opencode),
+        "-p".to_string(),
+        format!("{}:{}", ports.vnc, ports.vnc),
+        "-p".to_string(),
+        format!("{}:{}", ports.novnc, ports.novnc),
+        "-p".to_string(),
+        format!("{}:{}", ports.daemon, ports.daemon),
+        "-p".to_string(),
+        format!("{}:{}", ports.ssh, ports.ssh),
+        "-p".to_string(),
+        format!("{}:{}", ports.web_terminal, ports.web_terminal),
+        "-e".to_string(),
+        "DISPLAY=:1".to_string(),
+        "-e".to_string(),
+        format!("VNC_PORT={}", ports.vnc),
+        "-e".to_string(),
+        format!("NO_VNC_PORT={}", ports.novnc),
+        "-e".to_string(),
+        "VNC_RESOLUTION=1280x720".to_string(),
+        "-e".to_string(),
+        "VNC_USER=deck".to_string(),
+        "-e".to_string(),
+        "DECK_LOG_LEVEL=debug".to_string(),
+    ];
+
+    if persistence.enabled() {
+        for mount in mount_paths.mount_specs() {
+            args.push("--mount".to_string());
+            args.push(mount);
+        }
+        args.push("-w".to_string());
+        args.push(CONTAINER_WORKSPACE_DIR.to_string());
+    }
+
+    args.extend([
+        image.to_string(),
+        "opencode".to_string(),
+        "serve".to_string(),
+        "--hostname".to_string(),
+        "0.0.0.0".to_string(),
+        "--port".to_string(),
+        ports.opencode.to_string(),
+        "--print-logs".to_string(),
+        "--log-level".to_string(),
+        "DEBUG".to_string(),
+    ]);
+
+    let output = docker_cmd().args(args).output().map_err(|e| {
+        let msg = format!("Failed to start container: {}", e);
+        error!("[deck-docker] {}", msg);
+        msg
+    })?;
 
     if output.status.success() {
         let container_id = String::from_utf8_lossy(&output.stdout).trim().to_string();
@@ -542,6 +794,18 @@ pub fn stop_container(name: Option<&str>) -> Result<String, String> {
     let container_name = name.unwrap_or(DEFAULT_CONTAINER_NAME);
     info!("[deck-docker] Stopping container '{}'...", container_name);
 
+    if !container_exists(container_name) {
+        let msg = format!("Container {} not found", container_name);
+        info!("[deck-docker] {}", msg);
+        return Ok(msg);
+    }
+
+    if !is_container_running(container_name) {
+        let msg = format!("Container {} is already stopped", container_name);
+        info!("[deck-docker] {}", msg);
+        return Ok(msg);
+    }
+
     let stop_output = docker_cmd()
         .args(["stop", container_name])
         .output()
@@ -558,24 +822,52 @@ pub fn stop_container(name: Option<&str>) -> Result<String, String> {
         return Err(msg);
     }
 
-    info!("[deck-docker] Container stopped, removing...");
+    let msg = format!("Container {} stopped", container_name);
+    info!("[deck-docker] {}", msg);
+    Ok(msg)
+}
 
-    let rm_output = docker_cmd()
-        .args(["rm", container_name])
-        .output()
-        .map_err(|e| {
-            let msg = format!("Failed to remove container: {}", e);
+pub fn reset_sandbox(name: Option<&str>, storage_root: &Path) -> Result<String, String> {
+    let container_name = name.unwrap_or(DEFAULT_CONTAINER_NAME);
+    info!(
+        "[deck-docker] Resetting sandbox '{}' with storage root '{}'",
+        container_name,
+        storage_root.display()
+    );
+
+    if container_exists(container_name) {
+        let rm_output = docker_cmd()
+            .args(["rm", "-f", container_name])
+            .output()
+            .map_err(|e| {
+                let msg = format!("Failed to remove container '{}': {}", container_name, e);
+                error!("[deck-docker] {}", msg);
+                msg
+            })?;
+        if !rm_output.status.success() {
+            let stderr = String::from_utf8_lossy(&rm_output.stderr).to_string();
+            return Err(format!(
+                "Failed to remove container '{}': {}",
+                container_name, stderr
+            ));
+        }
+    }
+
+    if storage_root.exists() {
+        fs::remove_dir_all(storage_root).map_err(|e| {
+            let msg = format!(
+                "Failed to remove sandbox storage '{}': {}",
+                storage_root.display(),
+                e
+            );
             error!("[deck-docker] {}", msg);
             msg
         })?;
-
-    if rm_output.status.success() {
-        let msg = format!("Container {} stopped and removed", container_name);
-        info!("[deck-docker] {}", msg);
-        Ok(msg)
-    } else {
-        let msg = format!("Container {} stopped (removal warning)", container_name);
-        warn!("[deck-docker] {}", msg);
-        Ok(msg)
     }
+
+    Ok(format!(
+        "Sandbox '{}' reset and storage removed at '{}'",
+        container_name,
+        storage_root.display()
+    ))
 }

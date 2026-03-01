@@ -48,9 +48,21 @@ interface DockerInfo {
   resolved_path: string | null;
 }
 
+export interface SandboxStorageInfo {
+  root_dir: string;
+  exists: boolean;
+  size_bytes: number;
+  available: boolean;
+  legacy_container_detected: boolean;
+}
+
 interface SandboxConfig {
   image?: string;
   container_name?: string;
+  persistence?: {
+    enabled?: boolean;
+    root?: string;
+  };
 }
 
 interface PullProgress {
@@ -68,6 +80,7 @@ interface PullProgress {
 export const SANDBOX_KEYS = {
   status: (scope: string) => ['sandbox', 'status', scope] as const,
   docker: (scope: string) => ['sandbox', 'docker', scope] as const,
+  storage: (scope: string) => ['sandbox', 'storage', scope] as const,
 };
 
 // ---------------------------------------------------------------------------
@@ -213,6 +226,24 @@ export function useDockerCheck() {
     queryKey: SANDBOX_KEYS.docker(scope),
     queryFn: () => invoke<DockerInfo>('check_docker'),
     staleTime: 30_000,
+    retry: false,
+    enabled: isLocal,
+  });
+}
+
+/**
+ * Read local sandbox persistent storage information (local profile only).
+ */
+export function useSandboxStorageInfo() {
+  const { scope, isLocal } = useActiveConnection();
+
+  return useQuery({
+    queryKey: SANDBOX_KEYS.storage(scope),
+    queryFn: () =>
+      invoke<SandboxStorageInfo>('get_sandbox_storage_info', {
+        config: null,
+      }),
+    staleTime: 10_000,
     retry: false,
     enabled: isLocal,
   });
@@ -454,6 +485,7 @@ export function useStartSandbox() {
         });
       }
       void qc.invalidateQueries({ queryKey: SANDBOX_KEYS.status(scope) });
+      void qc.invalidateQueries({ queryKey: SANDBOX_KEYS.storage(scope) });
       void qc.invalidateQueries({ queryKey: ['project', scope] });
       void qc.invalidateQueries({ queryKey: CONFIG_KEYS.all(scope) });
     },
@@ -499,6 +531,7 @@ export function useStopSandbox() {
         useSandboxStore.getState().setStatus('idle');
       }
       void qc.invalidateQueries({ queryKey: SANDBOX_KEYS.status(scope) });
+      void qc.invalidateQueries({ queryKey: SANDBOX_KEYS.storage(scope) });
       void qc.invalidateQueries({ queryKey: ['project', scope] });
       clearProjectDirectory();
     },
@@ -508,6 +541,48 @@ export function useStopSandbox() {
         error instanceof Error ? error.message : 'Failed to stop sandbox';
       useSandboxStore.getState().setError(message);
       toast.error('Sandbox failed to stop', { description: message });
+    },
+  });
+}
+
+/**
+ * Reset local sandbox container and persistent storage.
+ * Remote profiles are not mutated.
+ */
+export function useResetSandboxStorage() {
+  const qc = useQueryClient();
+  const { scope, isLocal } = useActiveConnection();
+
+  return useMutation({
+    mutationFn: async () => {
+      if (!isLocal) return 'remote-profile-noop';
+      return invoke<string>('reset_sandbox_storage', {
+        config: null,
+      });
+    },
+    onSuccess: () => {
+      useSandboxStore.getState().setMutating(false);
+      if (isLocal) {
+        useSandboxStore.getState().setStatus('idle');
+        clearProjectDirectory();
+        void qc.invalidateQueries({ queryKey: SANDBOX_KEYS.status(scope) });
+        void qc.invalidateQueries({ queryKey: SANDBOX_KEYS.storage(scope) });
+        void qc.invalidateQueries({ queryKey: ['project', scope] });
+        void qc.invalidateQueries({ queryKey: CONFIG_KEYS.all(scope) });
+      }
+    },
+    onError: (error) => {
+      useSandboxStore.getState().setMutating(false);
+      const message =
+        error instanceof Error
+          ? error.message
+          : 'Failed to reset sandbox storage';
+      useSandboxStore.getState().setError(message);
+      toast.error('Sandbox reset failed', { description: message });
+    },
+    onMutate: () => {
+      useSandboxStore.getState().setMutating(true);
+      useSandboxStore.getState().setStatus('stopping');
     },
   });
 }

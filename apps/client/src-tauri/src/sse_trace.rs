@@ -85,7 +85,13 @@ fn session_file_path(sessions_dir: &Path, session_id: Option<&str>) -> PathBuf {
         Some(id) if !id.is_empty() => {
             let safe_name: String = id
                 .chars()
-                .map(|c| if c.is_ascii_alphanumeric() || c == '-' || c == '_' { c } else { '_' })
+                .map(|c| {
+                    if c.is_ascii_alphanumeric() || c == '-' || c == '_' {
+                        c
+                    } else {
+                        '_'
+                    }
+                })
                 .collect();
             sessions_dir.join(format!("{safe_name}.jsonl"))
         }
@@ -129,7 +135,10 @@ fn cleanup_old_sessions(sessions_dir: &Path) {
 
         let age = now.duration_since(modified).unwrap_or_default();
         if age.as_secs() > MAX_SESSION_AGE_SECS {
-            debug!("[deck-sse-trace] Removing expired session log: {}", path.display());
+            debug!(
+                "[deck-sse-trace] Removing expired session log: {}",
+                path.display()
+            );
             let _ = fs::remove_file(&path);
             total_bytes = total_bytes.saturating_sub(size);
             continue;
@@ -148,7 +157,10 @@ fn cleanup_old_sessions(sessions_dir: &Path) {
         if total_bytes <= MAX_SESSIONS_DIR_BYTES {
             break;
         }
-        debug!("[deck-sse-trace] Evicting session log for space: {}", path.display());
+        debug!(
+            "[deck-sse-trace] Evicting session log for space: {}",
+            path.display()
+        );
         if fs::remove_file(path).is_ok() {
             total_bytes = total_bytes.saturating_sub(*size);
         }

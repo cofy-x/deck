@@ -2,7 +2,7 @@
 
 `apps/client` is the Tauri v2 desktop cockpit for Deck. It now supports **dual connection modes**:
 
-- **Local sandbox mode**: manage Docker lifecycle through Rust commands (`start_sandbox`, `stop_sandbox`, `get_sandbox_status`).
+- **Local sandbox mode**: manage Docker lifecycle and storage through Rust commands (`start_sandbox`, `stop_sandbox`, `get_sandbox_status`, `get_sandbox_storage_info`, `reset_sandbox_storage`).
 - **Remote sandbox mode**: connect directly to existing OpenCode/daemon/noVNC services without running local Docker commands.
 
 ## Architecture
@@ -85,7 +85,7 @@ sequenceDiagram
 
     alt Local profile
       UI->>Rust: start_sandbox / stop_sandbox
-      Rust->>Docker: run / stop container
+      Rust->>Docker: run/start/stop container
       Docker-->>UI: status via get_sandbox_status
     else Remote profile
       UI->>OpenCode: health check (HTTP)
@@ -105,6 +105,7 @@ sequenceDiagram
 ### Local mode
 
 - Top bar action: **Start/Stop Sandbox**
+- `Stop Sandbox` only stops the container; it does not remove the container or persistent data.
 - Desktop boot: daemon probe -> auto `computeruse/start` when inactive -> noVNC probe
 - Terminal panel: enabled
 
@@ -118,6 +119,28 @@ sequenceDiagram
   - without remote Basic Auth: direct iframe to remote OpenCode URL
   - with remote Basic Auth: iframe goes through local Tauri bridge URL
 - Terminal panel: **disabled in this release** (explicit notice in UI)
+
+## Local Sandbox Persistence
+
+Local mode uses host-backed persistent storage under Tauri `app_data_dir` (default: `<app_data_dir>/sandbox/local`).
+
+Mounted paths:
+
+- `<root>/workspace` -> `/home/deck/workspace`
+- `<root>/deck-state` -> `/home/deck/.deck`
+- `<root>/opencode-share` -> `/home/deck/.local/share/opencode`
+- `<root>/opencode-state` -> `/home/deck/.local/state/opencode`
+
+Behavior:
+
+- `start_sandbox` reuses an existing running/stopped container when compatible.
+- `reset_sandbox_storage` performs destructive reset: remove container + delete persisted storage root.
+- `get_sandbox_storage_info` returns root path, existence, size, and availability for settings UI.
+
+Operational notes:
+
+- The local default working directory is `/home/deck/workspace`.
+- Existing credential restore flow from local SQLite remains enabled and complements filesystem persistence.
 
 ## Query Isolation
 

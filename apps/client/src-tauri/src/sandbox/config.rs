@@ -4,9 +4,31 @@ const DEFAULT_IMAGE: &str = "ghcr.io/cofy-x/deck/desktop-sandbox-ai:latest";
 const CONTAINER_NAME: &str = "deck-desktop-sandbox-ai";
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SandboxPersistenceConfig {
+    pub enabled: Option<bool>,
+    pub root: Option<String>,
+}
+
+impl Default for SandboxPersistenceConfig {
+    fn default() -> Self {
+        Self {
+            enabled: Some(true),
+            root: None,
+        }
+    }
+}
+
+impl SandboxPersistenceConfig {
+    pub fn enabled(&self) -> bool {
+        self.enabled.unwrap_or(true)
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SandboxConfig {
     pub image: Option<String>,
     pub container_name: Option<String>,
+    pub persistence: Option<SandboxPersistenceConfig>,
 }
 
 impl Default for SandboxConfig {
@@ -14,6 +36,7 @@ impl Default for SandboxConfig {
         Self {
             image: None,
             container_name: None,
+            persistence: Some(SandboxPersistenceConfig::default()),
         }
     }
 }
@@ -25,6 +48,10 @@ impl SandboxConfig {
 
     pub fn container_name(&self) -> &str {
         self.container_name.as_deref().unwrap_or(CONTAINER_NAME)
+    }
+
+    pub fn persistence(&self) -> SandboxPersistenceConfig {
+        self.persistence.clone().unwrap_or_default()
     }
 }
 
@@ -64,6 +91,15 @@ pub struct DockerInfo {
     pub available: bool,
     pub error: Option<String>,
     pub resolved_path: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SandboxStorageInfo {
+    pub root_dir: String,
+    pub exists: bool,
+    pub size_bytes: u64,
+    pub available: bool,
+    pub legacy_container_detected: bool,
 }
 
 pub const DEFAULT_CONTAINER_NAME: &str = CONTAINER_NAME;

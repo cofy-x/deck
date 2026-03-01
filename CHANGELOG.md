@@ -11,6 +11,13 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 - Enhanced client log viewer with category filters and per-session tracing for easier debugging.
 - Added a dedicated unsigned macOS client release workflow (`client-release-unsigned.yml`) for emergency delivery when notarization is delayed.
+- Added local sandbox persistent storage in the desktop client with host-backed mounts for workspace and runtime state.
+- Added local sandbox storage management commands (`get_sandbox_storage_info`, `reset_sandbox_storage`) and settings UI actions.
+
+### Changed
+
+- Updated local sandbox container lifecycle: `Stop Sandbox` now stops the container without removing it, and subsequent starts reuse existing containers.
+- Updated project picker local fallback root to `/home/deck/workspace` to align with persistent local workspace defaults.
 
 ### Fixed
 
