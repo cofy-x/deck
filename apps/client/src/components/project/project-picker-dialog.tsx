@@ -48,10 +48,9 @@ export function ProjectPickerDialog() {
     useState<ProjectDirectoryItem | null>(null);
   const { data: paths } = usePaths();
 
-  // Prefer server-reported working directory, then user home.
-  // Fall back to the local persistent workspace path.
-  const rootDirectory =
-    paths?.directory?.trim() || paths?.home || LOCAL_SANDBOX_WORKSPACE;
+  // Keep the picker rooted to a stable base path.
+  // Prefer user home, then fall back to the local persistent workspace path.
+  const rootDirectory = paths?.home || LOCAL_SANDBOX_WORKSPACE;
 
   const { data: matchedDirectories = [], isLoading: isFindingDirectories } =
     useFindDirectories(rootDirectory, search);
