@@ -89,6 +89,12 @@ jobs:
             exit 1
           fi
 
+      - name: Capture resolved build commit SHA
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo "BUILD_COMMIT_SHA=$(git rev-parse HEAD)" >> "$GITHUB_ENV"
+
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
@@ -204,7 +210,7 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ env.TAG }}
-          target_commitish: ${{ inputs.ref }}
+          target_commitish: ${{ env.BUILD_COMMIT_SHA }}
           draft: ${{ inputs.draft }}
           prerelease: ${{ inputs.prerelease }}
           generate_release_notes: true
@@ -229,6 +235,7 @@ jobs:
             echo "- Version: \`${VERSION}\`"
             echo "- Tag: \`${TAG}\`"
             echo "- Ref: \`${{ inputs.ref }}\`"
+            echo "- Build Commit SHA: \`${BUILD_COMMIT_SHA}\`"
             echo "- Draft: \`${{ inputs.draft }}\`"
             echo "- Prerelease: \`${{ inputs.prerelease }}\`"
             echo "- Release URL: ${{ steps.publish_release.outputs.url }}"
