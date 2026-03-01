@@ -10,6 +10,11 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 ### Added
 
 - Enhanced client log viewer with category filters and per-session tracing for easier debugging.
+- Added a dedicated unsigned macOS client release workflow (`client-release-unsigned.yml`) for emergency delivery when notarization is delayed.
+
+### Fixed
+
+- Pinned client release tag creation to the resolved build commit SHA in release workflows to keep published source tags aligned with built DMG artifacts.
 
 ## [0.0.1-alpha.3.2] - 2026-02-28
 
