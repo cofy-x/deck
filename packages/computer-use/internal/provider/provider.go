@@ -17,7 +17,9 @@ import (
 	"github.com/cofy-x/deck/packages/core-go/pkg/log"
 )
 
-const FixedDbusAddress = "unix:path=/var/run/dbus/user_bus_socket"
+const (
+	FixedDbusAddress = "unix:path=/var/run/dbus/user_bus_socket"
+)
 
 type Process struct {
 	Name        string
@@ -286,9 +288,6 @@ func (c *ComputerUse) startProcess(process *Process) {
 		// Create context for the process
 		process.ctx, process.cancel = context.WithCancel(context.Background())
 
-		// Create command
-		process.cmd = exec.CommandContext(process.ctx, process.Command, process.Args...)
-
 		// Environment Variable Injection
 		fullEnv := os.Environ()
 		for k, v := range process.Env {
@@ -296,22 +295,13 @@ func (c *ComputerUse) startProcess(process *Process) {
 		}
 		// Force inject fixed D-Bus address, override any potential drift
 		fullEnv = append(fullEnv, "DBUS_SESSION_BUS_ADDRESS="+FixedDbusAddress)
-		process.cmd.Env = fullEnv
 
 		// Process Group and Privilege Switching
-		sysAttr := &syscall.SysProcAttr{
-			Setpgid: true, // Create process group, for easy killing of child processes
-		}
+		sysAttr := processSysProcAttr(process.Name, process.User)
 
-		// If current is root but configured for a normal user, execute privilege drop
-		if os.Getuid() == 0 && process.User != "" && process.User != "root" {
-			if u, err := user.Lookup(process.User); err == nil {
-				uid, _ := strconv.Atoi(u.Uid)
-				gid, _ := strconv.Atoi(u.Gid)
-				sysAttr.Credential = &syscall.Credential{Uid: uint32(uid), Gid: uint32(gid)}
-				log.Infof("Process %s will run as user: %s (uid:%d)", process.Name, process.User, uid)
-			}
-		}
+		// Create command
+		process.cmd = exec.CommandContext(process.ctx, process.Command, process.Args...)
+		process.cmd.Env = fullEnv
 		process.cmd.SysProcAttr = sysAttr
 
 		// Log Handling
@@ -339,6 +329,23 @@ func (c *ComputerUse) startProcess(process *Process) {
 	process.mu.Lock()
 	process.running = false
 	process.mu.Unlock()
+}
+
+func processSysProcAttr(processName, runAsUser string) *syscall.SysProcAttr {
+	sysAttr := &syscall.SysProcAttr{
+		Setpgid: true,
+	}
+
+	if os.Getuid() == 0 && runAsUser != "" && runAsUser != "root" {
+		if u, err := user.Lookup(runAsUser); err == nil {
+			uid, _ := strconv.Atoi(u.Uid)
+			gid, _ := strconv.Atoi(u.Gid)
+			sysAttr.Credential = &syscall.Credential{Uid: uint32(uid), Gid: uint32(gid)}
+			log.Infof("Process %s will run as user: %s (uid:%d)", processName, runAsUser, uid)
+		}
+	}
+
+	return sysAttr
 }
 
 func (c *ComputerUse) Stop() (*api.Empty, error) {

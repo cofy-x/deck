@@ -90,6 +90,52 @@ pub(super) fn container_image_checked(name: &str) -> Result<Option<String>, Stri
     Err(format!("Failed to inspect container image: {stderr}"))
 }
 
+pub(super) fn container_image_id_checked(name: &str) -> Result<Option<String>, String> {
+    let output = docker_cmd()
+        .args(["inspect", "--format", "{{.Image}}", name])
+        .output()
+        .map_err(|error| format!("Failed to inspect container image ID: {error}"))?;
+
+    if output.status.success() {
+        let image_id = String::from_utf8_lossy(&output.stdout).trim().to_string();
+        if image_id.is_empty() {
+            return Ok(None);
+        }
+        return Ok(Some(image_id));
+    }
+
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    let stderr = stderr.trim();
+    if stderr.contains("No such object") || stderr.contains("No such container") {
+        return Ok(None);
+    }
+
+    Err(format!("Failed to inspect container image ID: {stderr}"))
+}
+
+pub(super) fn image_id_checked(image: &str) -> Result<Option<String>, String> {
+    let output = docker_cmd()
+        .args(["image", "inspect", "--format", "{{.Id}}", image])
+        .output()
+        .map_err(|error| format!("Failed to inspect requested image ID: {error}"))?;
+
+    if output.status.success() {
+        let image_id = String::from_utf8_lossy(&output.stdout).trim().to_string();
+        if image_id.is_empty() {
+            return Ok(None);
+        }
+        return Ok(Some(image_id));
+    }
+
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    let stderr = stderr.trim();
+    if stderr.contains("No such image") || stderr.contains("No such object") {
+        return Ok(None);
+    }
+
+    Err(format!("Failed to inspect requested image ID: {stderr}"))
+}
+
 fn inspect_container_mount_destinations(name: &str) -> Result<Vec<String>, String> {
     let output = docker_cmd()
         .args(["inspect", "--format", "{{json .Mounts}}", name])

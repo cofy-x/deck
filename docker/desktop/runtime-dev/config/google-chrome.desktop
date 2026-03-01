@@ -1,0 +1,9 @@
+[Desktop Entry]
+Version=1.0
+Type=Application
+Name=Google Chrome
+Comment=Access the Internet safely
+Exec=/usr/bin/google-chrome --no-sandbox --test-type --disable-dev-shm-usage --no-first-run --no-default-browser-check --password-store=basic %U
+Icon=google-chrome
+Terminal=false
+Categories=Network;WebBrowser;

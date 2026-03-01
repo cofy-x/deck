@@ -9,7 +9,8 @@ use super::command::docker_cmd;
 use super::paths::{SandboxMountPaths, CONTAINER_WORKSPACE_DIR};
 use super::probe::{
     container_exists_checked, container_has_required_mounts, container_image_checked,
-    running_container_id_by_exact_name, running_container_id_by_exact_name_checked,
+    container_image_id_checked, image_id_checked, running_container_id_by_exact_name,
+    running_container_id_by_exact_name_checked,
 };
 
 pub fn get_container_status(name: Option<&str>) -> SandboxStatus {
@@ -42,26 +43,43 @@ pub fn start_container(config: &SandboxConfig, storage_root: &Path) -> Result<St
 
     let has_container = container_exists_checked(name)?;
     if has_container {
-        match container_image_checked(name)? {
-            Some(existing_image) if existing_image != image => {
+        let existing_image = container_image_checked(name)?;
+        let existing_image_id = container_image_id_checked(name)?;
+        let requested_image_id = image_id_checked(image)?;
+
+        let should_recreate = match &existing_image {
+            Some(existing_ref) if existing_ref != image => {
                 info!(
                     "[deck-docker] Existing container '{}' image '{}' differs from requested '{}', recreating container",
-                    name, existing_image, image
+                    name, existing_ref, image
                 );
-                let rm_output = docker_cmd()
-                    .args(["rm", "-f", name])
-                    .output()
-                    .map_err(|error| format!("Failed to recreate existing container: {error}"))?;
-                if !rm_output.status.success() {
-                    let stderr = String::from_utf8_lossy(&rm_output.stderr);
-                    return Err(format!(
-                        "Failed to recreate existing container '{}': {}",
-                        name,
-                        stderr.trim()
-                    ));
-                }
+                true
             }
-            _ => {}
+            _ => match (&existing_image_id, &requested_image_id) {
+                (Some(existing_id), Some(requested_id)) if existing_id != requested_id => {
+                    info!(
+                        "[deck-docker] Existing container '{}' image ID '{}' differs from requested image ID '{}', recreating container",
+                        name, existing_id, requested_id
+                    );
+                    true
+                }
+                _ => false,
+            },
+        };
+
+        if should_recreate {
+            let rm_output = docker_cmd()
+                .args(["rm", "-f", name])
+                .output()
+                .map_err(|error| format!("Failed to recreate existing container: {error}"))?;
+            if !rm_output.status.success() {
+                let stderr = String::from_utf8_lossy(&rm_output.stderr);
+                return Err(format!(
+                    "Failed to recreate existing container '{}': {}",
+                    name,
+                    stderr.trim()
+                ));
+            }
         }
 
         let has_container = container_exists_checked(name)?;

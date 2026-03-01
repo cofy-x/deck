@@ -1,91 +1,52 @@
-# Deck AI Sandbox
+# Deck Desktop Runtime AI (L3)
 
-The **Deck AI Sandbox** is an advanced, high-performance container environment designed for AI-driven development and autonomous "computer-use" tasks. Built on the `deck-base-sandbox`, it leverages the **Deck Daemon** as PID 1 to provide industrial-grade process management and stability.
+`desktop-runtime-ai` is the AI tooling layer in the desktop sandbox image stack.
+It extends `desktop-runtime-dev` and keeps AI CLI dependencies isolated from frequently changing daemon/client code.
 
----
+## Layer Position
 
-## 🚀 Key Features
+Desktop image layering:
 
-- **Integrated AI Toolchain**: Pre-installed with modern AI CLIs including `claude-code`, `gemini-cli`, `opencode-ai`, and `codex`.
-- **Deck Daemon (PID 1)**: A custom Go-based init system that handles zombie process reaping, signal forwarding, and graceful shutdowns.
-- **Computer-Use API**: Built-in REST/RPC endpoints for mouse/keyboard control, screen capture, and dynamic browser orchestration.
-- **Developer Productivity**: Full XFCE4 desktop environment with Zsh, Node.js, Go, and Rust runtimes.
-- **Dynamic Chrome Management**: Optimized Google Chrome instance with CDP (Remote Debugging) enabled for AI agents.
+1. `desktop-runtime-base` (L1): OS and desktop foundation
+2. `desktop-runtime-dev` (L2): developer runtimes and Chrome behavior for XFCE/noVNC
+3. `desktop-runtime-ai` (L3): AI CLI tooling layer (this directory)
+4. `desktop-sandbox-ai` (L4): daemon + computer-use + deck CLI integration
 
----
+## What This Layer Adds
 
-## 🛠 Image Hierarchy
+- Installs `opencode-ai` globally (`opencode` command).
+- Keeps AI tooling installation in a dedicated cacheable layer.
 
-This image is the final layer of a strategic build process:
+Current default is OpenCode-first for `apps/client` local sandbox flows.
 
-1. **`base-desktop`**: Core GUI infrastructure (Xvfb, VNC, Xfce4).
-2. **`deck-dev`**: Developer stack (Node.js, Go, Rust, Chrome).
-3. **`deck-base-sandbox`**: Integrates `deck-daemon` as the system init (PID 1).
-4. **`deck-ai-sandbox`**: (This image) Adds specialized AI developer tools.
+## What This Layer Intentionally Does Not Add
 
----
+- No `deck-daemon` process supervision.
+- No computer-use REST/RPC endpoints.
+- No additional AI CLIs by default (Claude Code / Gemini / Codex).
 
-## 💻 Recommended Resources (Kubernetes)
+If additional AI CLIs are needed, add them in an optional follow-up layer to avoid increasing default image size and build time.
 
-To prevent latency in **VS Code Remote-SSH** and ensure smooth performance for the **AI CLI** tools and **Chrome**, the following resource specifications are recommended:
+## Build and Run
 
-### Resource Requests & Limits
-
-| Resource   | Request           | Limit             | Reason                                                          |
-| ---------- | ----------------- | ----------------- | --------------------------------------------------------------- |
-| **CPU**    | `2000m` (2 vCPUs) | `4000m` (4 vCPUs) | Ensures UI responsiveness and fast AI indexing.                 |
-| **Memory** | `4Gi`             | `8Gi`             | Prevents OOM crashes during heavy multi-tab browsing or builds. |
-
-### Shared Memory (Critical)
-
-Chrome and the X Server require significant shared memory to prevent crashes or "white screen" issues. **Do not rely on the default 64Mi limit.** You must mount a memory-backed volume to `/dev/shm`:
-
-```yaml
-volumeMounts:
-  - name: dshm
-    mountPath: /dev/shm
-volumes:
-  - name: dshm
-    emptyDir:
-      medium: Memory
-      sizeLimit: '1Gi'
-```
-
-## 📦 Installed AI Tools
-
-| Tool            | Command    | Description                                            |
-| --------------- | ---------- | ------------------------------------------------------ |
-| **Claude Code** | `claude`   | Anthropic’s official CLI for agentic coding.           |
-| **Gemini CLI**  | `gemini`   | Google’s toolchain for interacting with Gemini models. |
-| **OpenCode AI** | `opencode` | AI-powered coding assistant and workspace manager.     |
-| **Codex**       | `codex`    | OpenAI’s legacy/specialized coding interface.          |
-
-## 🔧 Usage & Deployment
-
-### Building the Image
-
-From the project root, use the provided `Makefile`:
+From repo root:
 
 ```bash
-make build-ai
+make build-desktop-runtime-ai
+make run-desktop-runtime-ai
 ```
 
-### Deploying to Kubernetes
+Or directly in this directory:
 
-Deploy the StatefulSet using the `deck` namespace:
-
+```bash
+bash build.sh
+bash run.sh
 ```
-make deploy-orb TYPE=ai
+
+## Quick Verification
+
+```bash
+docker run --rm --platform linux/amd64 deck/desktop-runtime-ai:latest opencode --version
 ```
 
-### API Access
-
-The **Deck Daemon** exposes a toolbox API (default port `2280`) for external control:
-
-- **Status**: `GET /computeruse/status`
-- **Open Browser**: `POST /computeruse/browser/open`
-- **Screenshot**: `GET /computeruse/screenshot/compressed`
-
-## 🛡 Security & Isolation
-
-The sandbox utilizes **Privilege Separation**. While the daemon manages system-level duties as root, all AI tools and desktop applications are executed as the `deck` user via `SysProcAttr.Credential` to ensure your host system remains secure.
+Expected: command exits successfully and prints the OpenCode version.
