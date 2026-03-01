@@ -27,21 +27,34 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 RUN chsh -s /usr/bin/zsh ${VNC_USER}
 
 # Create a desktop shortcut
+COPY config/google-chrome.desktop /tmp/google-chrome.desktop
+COPY config/google-chrome-alias.sh /tmp/google-chrome-alias.sh
+
 RUN mkdir -p /home/${VNC_USER}/Desktop && \
-    printf '[Desktop Entry]\n\
-Version=1.0\n\
-Type=Application\n\
-Name=Google Chrome\n\
-Comment=Access the Internet safely\n\
-Exec=/usr/bin/google-chrome --no-sandbox --test-type --disable-dev-shm-usage --no-first-run --no-default-browser-check %%U\n\
-Icon=google-chrome\n\
-Terminal=false\n\
-Categories=Network;WebBrowser;\n' > /home/${VNC_USER}/Desktop/google-chrome.desktop && \
-    chmod +x /home/${VNC_USER}/Desktop/google-chrome.desktop && \
-    cp /home/${VNC_USER}/Desktop/google-chrome.desktop /usr/share/applications/ && \
+    install -m 0755 /tmp/google-chrome.desktop /home/${VNC_USER}/Desktop/google-chrome.desktop && \
+    install -m 0644 /tmp/google-chrome.desktop /usr/share/applications/google-chrome.desktop && \
     chown -R ${VNC_USER}:${VNC_USER} /home/${VNC_USER}/Desktop && \
-    echo 'alias google-chrome="/usr/bin/google-chrome --no-sandbox --test-type --disable-dev-shm-usage --no-first-run 2>/dev/null"' >> /etc/zsh/zshrc && \
-    echo 'alias google-chrome="/usr/bin/google-chrome --no-sandbox --test-type --disable-dev-shm-usage --no-first-run 2>/dev/null"' >> /etc/bash.bashrc
+    install -m 0644 /tmp/google-chrome-alias.sh /etc/profile.d/deck-google-chrome.sh && \
+    rm -f /tmp/google-chrome.desktop /tmp/google-chrome-alias.sh && \
+    printf '\n[ -f /etc/profile.d/deck-google-chrome.sh ] && . /etc/profile.d/deck-google-chrome.sh\n' >> /etc/zsh/zshrc && \
+    printf '\n[ -f /etc/profile.d/deck-google-chrome.sh ] && . /etc/profile.d/deck-google-chrome.sh\n' >> /etc/bash.bashrc
+
+COPY config/chrome-policy-managed.json /tmp/chrome-policy-managed.json
+
+RUN install -d -m 0755 /etc/opt/chrome/policies/managed && \
+    install -m 0644 /tmp/chrome-policy-managed.json /etc/opt/chrome/policies/managed/deck-sandbox.json && \
+    rm -f /tmp/chrome-policy-managed.json
+
+COPY scripts/deck-fix-chrome-launcher.sh /usr/local/bin/deck-fix-chrome-launcher
+COPY scripts/deck-patch-xinitrc.sh /usr/local/bin/deck-patch-xinitrc
+COPY config/deck-fix-chrome-launcher.desktop /tmp/deck-fix-chrome-launcher.desktop
+
+RUN mkdir -p /etc/xdg/autostart && \
+    install -m 0644 /tmp/deck-fix-chrome-launcher.desktop /etc/xdg/autostart/deck-fix-chrome-launcher.desktop && \
+    rm -f /tmp/deck-fix-chrome-launcher.desktop && \
+    chmod 0755 /usr/local/bin/deck-fix-chrome-launcher /usr/local/bin/deck-patch-xinitrc && \
+    /usr/local/bin/deck-patch-xinitrc && \
+    grep -q 'deck-fix-chrome-launcher' /etc/xdg/xfce4/xinitrc
 
 # Install Go
 ENV GO_VERSION=1.25.6

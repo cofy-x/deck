@@ -55,10 +55,7 @@ printf "%s\n" "-------------------------------------------------------"
 printf "View Logs:     docker logs -f %s\n" "$CONTAINER_NAME"
 printf "Enter Shell:   docker exec -it -u deck %s /usr/bin/zsh\n" "$CONTAINER_NAME"
 printf "%s\n" "-------------------------------------------------------"
-printf "Gemini:        docker exec %s gemini --version\n" "$CONTAINER_NAME"
 printf "OpenCode:      docker exec %s opencode --version\n" "$CONTAINER_NAME"
-printf "Codex:         docker exec %s codex --version\n" "$CONTAINER_NAME"
-printf "Claude:        docker exec %s claude --version\n" "$CONTAINER_NAME"
 printf "%s\n" "-------------------------------------------------------"
 
 # Architecture Warning

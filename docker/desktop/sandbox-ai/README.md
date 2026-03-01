@@ -5,8 +5,8 @@
 The Deck environment is built through a **four-tier layering process**. This architecture is designed to maximize build cache efficiency and isolate heavy dependencies from rapid code iterations.
 
 1. **`desktop-runtime-base` (L1)**: The foundation. It manages the core OS, user identity (`deck`), and basic system utilities (SSH, Locales).
-2. **`desktop-runtime-dev` (L2)**: The productivity layer. Built on L1, it integrates the developer stack: Google Chrome, Go, Node.js (via NVM), and a customized Zsh environment.
-3. **`desktop-runtime-ai` (L3)**: **The AI Tooling Isolation Layer**. This tier "freezes" the heavy installation of Claude Code, Gemini CLI, and OpenCode. By isolating these tools here, we avoid re-downloading gigabytes of data when the daemon code changes.
+2. **`desktop-runtime-dev` (L2)**: The productivity layer. Built on L1, it integrates Google Chrome, Go, Node.js (via NVM), and Zsh, and applies Chrome launcher trust/keyring mitigations for XFCE/noVNC. See [Runtime Dev README](../runtime-dev/README.md).
+3. **`desktop-runtime-ai` (L3)**: **The AI Tooling Isolation Layer**. This tier currently ships the OpenCode-first runtime and isolates AI-tooling dependencies from rapid daemon code iterations.
 4. **`desktop-sandbox-ai` (L4)**: The execution layer. This final tier injects the **`deck-daemon`**, `computer-use`, and **`deck` CLI** binaries, plus the built-in OpenCode skill `deck-cli`. The daemon acts as **PID 1** and is the primary target for rapid development.
 
 ---
@@ -42,6 +42,7 @@ The daemon implements the `IComputerUse` interface, serving as a "digital prosth
 - **Industrial-Grade Optimization**: Flags include `--no-sandbox`, `--test-type` (to remove security banners), and `--remote-debugging-port=9222`.
 - **Coordinate Alignment**: Resolution is locked at **1280x720** via `--window-size` to ensure consistent AI visual recognition and click coordinates.
 - **CDP Discovery**: Port `9222` allows AI agents to connect via Playwright or Puppeteer for direct DOM manipulation.
+- **Desktop Launcher Stability**: Chrome desktop icon trust and keyring-safe behavior are handled in L2 (`desktop-runtime-dev`). See [Runtime Dev README](../runtime-dev/README.md).
 
 ---
 
@@ -74,7 +75,7 @@ Compatibility note:
 
 The sandbox provides a managed environment for modern development and AI workflows:
 
-- **AI CLI Stack**: Pre-configured access to `claude`, `gemini`, and `opencode-ai` via the stable L3 layer.
+- **AI CLI Stack**: OpenCode-first runtime via the stable L3 layer. Additional AI CLIs (Claude Code, Gemini, Codex) can be added in optional follow-up layers when required.
 - **Full-Stack Hosting**: Optimized execution for **Go, Python, and Node.js** (v24+) applications.
 - **Unified Logging**: `stdout`/`stderr` from all managed processes are redirected to `.deck/logs/*.log` for real-time remote tracking.
 

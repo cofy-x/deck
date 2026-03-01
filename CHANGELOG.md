@@ -7,6 +7,23 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+### Added
+
+- Added `desktop-runtime-dev` Chrome configuration assets and startup hooks to enforce trusted desktop launcher metadata in XFCE/noVNC sessions.
+- Added `docker/desktop/runtime-dev/README.md` to document Chrome launcher trust/keyring handling, verification commands, and troubleshooting.
+
+### Changed
+
+- Updated desktop sandbox startup logic in `apps/client` to recreate existing containers when the requested image ID changes, even if the tag string is unchanged.
+- Updated `desktop-runtime-ai` default toolset to OpenCode-only, with Claude Code / Gemini / Codex moved out of the default layer.
+- Refactored `packages/computer-use` process startup to extract syscall attribute and privilege-drop setup into `processSysProcAttr` without changing runtime behavior.
+- Updated desktop runtime documentation to align image-layer responsibilities (`runtime-dev` launcher handling, `runtime-ai` OpenCode-first scope).
+
+### Fixed
+
+- Fixed repeated `Untrusted application launcher` prompts when clicking the desktop Google Chrome icon in XFCE/noVNC by applying launcher trust metadata and checksum repair at startup.
+- Fixed Chrome keyring/password-store interruptions in containerized desktop sessions by combining `--password-store=basic` launcher defaults with managed Chrome password-manager policies.
+
 ## [0.0.1-alpha.3.3] - 2026-03-01
 
 ### Added
