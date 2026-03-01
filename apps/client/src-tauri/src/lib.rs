@@ -226,13 +226,16 @@ async fn reset_sandbox_storage(
         .app_data_dir()
         .map_err(|error| format!("Failed to resolve app data dir: {error}"))?;
     let storage_root = sandbox::resolve_storage_root(&app_data_dir, &cfg);
-    tokio::task::spawn_blocking(move || sandbox::reset_sandbox(None, &storage_root))
-        .await
-        .map_err(|e| {
-            let msg = format!("Task join error: {}", e);
-            error!("[deck] {}", msg);
-            msg
-        })?
+    let container_name = cfg.container_name().to_string();
+    tokio::task::spawn_blocking(move || {
+        sandbox::reset_sandbox(Some(&container_name), &storage_root)
+    })
+    .await
+    .map_err(|e| {
+        let msg = format!("Task join error: {}", e);
+        error!("[deck] {}", msg);
+        msg
+    })?
 }
 
 // ---------------------------------------------------------------------------

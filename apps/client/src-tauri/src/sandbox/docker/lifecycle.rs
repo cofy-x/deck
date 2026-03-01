@@ -8,8 +8,8 @@ use crate::sandbox::config::{SandboxConfig, SandboxPorts, SandboxStatus, DEFAULT
 use super::command::docker_cmd;
 use super::paths::{SandboxMountPaths, CONTAINER_WORKSPACE_DIR};
 use super::probe::{
-    container_exists_checked, container_has_required_mounts, running_container_id_by_exact_name,
-    running_container_id_by_exact_name_checked,
+    container_exists_checked, container_has_required_mounts, container_image_checked,
+    running_container_id_by_exact_name, running_container_id_by_exact_name_checked,
 };
 
 pub fn get_container_status(name: Option<&str>) -> SandboxStatus {
@@ -42,55 +42,85 @@ pub fn start_container(config: &SandboxConfig, storage_root: &Path) -> Result<St
 
     let has_container = container_exists_checked(name)?;
     if has_container {
-        if persistence.enabled() {
-            match container_has_required_mounts(name) {
-                Ok(true) => {}
-                Ok(false) => {
-                    return Err(
-                        "Existing sandbox container was created without persistent mounts. Please use \"Reset Local Sandbox Data\" in Settings before starting again."
-                            .to_string(),
-                    );
-                }
-                Err(error) => {
+        match container_image_checked(name)? {
+            Some(existing_image) if existing_image != image => {
+                info!(
+                    "[deck-docker] Existing container '{}' image '{}' differs from requested '{}', recreating container",
+                    name, existing_image, image
+                );
+                let rm_output = docker_cmd()
+                    .args(["rm", "-f", name])
+                    .output()
+                    .map_err(|error| format!("Failed to recreate existing container: {error}"))?;
+                if !rm_output.status.success() {
+                    let stderr = String::from_utf8_lossy(&rm_output.stderr);
                     return Err(format!(
-                        "Failed to validate existing sandbox container mounts: {}",
-                        error
+                        "Failed to recreate existing container '{}': {}",
+                        name,
+                        stderr.trim()
                     ));
                 }
             }
+            _ => {}
         }
 
-        if let Some(container_id) = running_container_id_by_exact_name_checked(name)? {
+        let has_container = container_exists_checked(name)?;
+        if !has_container {
             info!(
-                "[deck-docker] Container '{}' already running (ID: {})",
-                name, container_id
+                "[deck-docker] Container '{}' removed for recreation, creating a fresh one",
+                name
             );
-            return Ok(container_id);
-        }
+        } else {
+            if persistence.enabled() {
+                match container_has_required_mounts(name) {
+                    Ok(true) => {}
+                    Ok(false) => {
+                        return Err(
+                        "Existing sandbox container was created without persistent mounts. Please use \"Reset Local Sandbox Data\" in Settings before starting again."
+                            .to_string(),
+                    );
+                    }
+                    Err(error) => {
+                        return Err(format!(
+                            "Failed to validate existing sandbox container mounts: {}",
+                            error
+                        ));
+                    }
+                }
+            }
 
-        info!(
-            "[deck-docker] Container '{}' exists and is stopped, starting...",
-            name
-        );
-        let start_output = docker_cmd()
-            .args(["start", name])
-            .output()
-            .map_err(|error| format!("Failed to start existing container: {error}"))?;
-        if !start_output.status.success() {
-            let stderr = String::from_utf8_lossy(&start_output.stderr);
-            return Err(format!("Failed to start existing container: {stderr}"));
-        }
+            if let Some(container_id) = running_container_id_by_exact_name_checked(name)? {
+                info!(
+                    "[deck-docker] Container '{}' already running (ID: {})",
+                    name, container_id
+                );
+                return Ok(container_id);
+            }
 
-        if let Some(container_id) = running_container_id_by_exact_name_checked(name)? {
-            return Ok(container_id);
+            info!(
+                "[deck-docker] Container '{}' exists and is stopped, starting...",
+                name
+            );
+            let start_output = docker_cmd()
+                .args(["start", name])
+                .output()
+                .map_err(|error| format!("Failed to start existing container: {error}"))?;
+            if !start_output.status.success() {
+                let stderr = String::from_utf8_lossy(&start_output.stderr);
+                return Err(format!("Failed to start existing container: {stderr}"));
+            }
+
+            if let Some(container_id) = running_container_id_by_exact_name_checked(name)? {
+                return Ok(container_id);
+            }
+            let stdout = String::from_utf8_lossy(&start_output.stdout)
+                .trim()
+                .to_string();
+            if !stdout.is_empty() {
+                return Ok(stdout);
+            }
+            return Err("Container started but ID could not be resolved".to_string());
         }
-        let stdout = String::from_utf8_lossy(&start_output.stdout)
-            .trim()
-            .to_string();
-        if !stdout.is_empty() {
-            return Ok(stdout);
-        }
-        return Err("Container started but ID could not be resolved".to_string());
     }
 
     let mount_paths = SandboxMountPaths::from_root(storage_root);

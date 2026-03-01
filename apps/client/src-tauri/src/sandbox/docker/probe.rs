@@ -67,6 +67,29 @@ pub(super) fn container_exists_checked(name: &str) -> Result<bool, String> {
     Ok(container_id_by_exact_name(name, true)?.is_some())
 }
 
+pub(super) fn container_image_checked(name: &str) -> Result<Option<String>, String> {
+    let output = docker_cmd()
+        .args(["inspect", "--format", "{{.Config.Image}}", name])
+        .output()
+        .map_err(|error| format!("Failed to inspect container image: {error}"))?;
+
+    if output.status.success() {
+        let image = String::from_utf8_lossy(&output.stdout).trim().to_string();
+        if image.is_empty() {
+            return Ok(None);
+        }
+        return Ok(Some(image));
+    }
+
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    let stderr = stderr.trim();
+    if stderr.contains("No such object") || stderr.contains("No such container") {
+        return Ok(None);
+    }
+
+    Err(format!("Failed to inspect container image: {stderr}"))
+}
+
 fn inspect_container_mount_destinations(name: &str) -> Result<Vec<String>, String> {
     let output = docker_cmd()
         .args(["inspect", "--format", "{{json .Mounts}}", name])
