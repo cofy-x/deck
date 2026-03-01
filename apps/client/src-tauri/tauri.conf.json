@@ -26,6 +26,9 @@
   "bundle": {
     "active": true,
     "targets": "all",
+    "macOS": {
+      "entitlements": "./Entitlements.plist"
+    },
     "externalBin": [
       "sidecars/opencode",
       "sidecars/pilot-server",
