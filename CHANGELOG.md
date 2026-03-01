@@ -7,6 +7,8 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+## [0.0.1-alpha.3.4] - 2026-03-02
+
 ### Added
 
 - Added `desktop-runtime-dev` Chrome configuration assets and startup hooks to enforce trusted desktop launcher metadata in XFCE/noVNC sessions.
