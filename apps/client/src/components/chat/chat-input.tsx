@@ -4,12 +4,13 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 import { useCallback, useRef, useState, useMemo, useEffect } from 'react';
-import { Send, Loader2, Paperclip, Square, X } from 'lucide-react';
+import { ArrowUp, Loader2, Paperclip, Square, X } from 'lucide-react';
 import { toast } from 'sonner';
 import type { FilePartInput } from '@opencode-ai/sdk/v2/client';
 
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
+import { ShortcutTooltipContent } from '@/components/ui/shortcut-tooltip-content';
 import {
   Tooltip,
   TooltipContent,
@@ -30,6 +31,7 @@ import {
   type CommandItem,
 } from './command-popover';
 import { t } from '@/i18n';
+import { cn } from '@/lib/utils';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -243,6 +245,7 @@ export function ChatInput({
     if (popoverMode === 'command') return commandItemCount;
     return 0;
   }, [popoverMode, mentionItemCount, commandItemCount]);
+  const sendEnabled = !disabled && !isSending && inputText.trim().length > 0;
 
   // -------------------------------------------------------------------------
   // Mention / command detection on input change
@@ -567,7 +570,10 @@ export function ChatInput({
                 : t('chat.placeholder_active')
             }
             disabled={disabled || isSending || isStopping || canStop}
-            className="h-[44px] min-h-[44px] max-h-[44px] resize-none overflow-y-auto border-0 bg-transparent px-0 py-2 text-sm text-foreground shadow-none focus-visible:border-transparent focus-visible:ring-0"
+            className={cn(
+              "h-[44px] min-h-[44px] max-h-[44px] resize-none overflow-y-auto border-0 bg-transparent px-0 py-2 text-sm text-foreground shadow-none focus-visible:border-transparent focus-visible:ring-0",
+              !inputText && 'text-foreground/70',
+            )}
             rows={1}
           />
         </div>
@@ -620,7 +626,7 @@ export function ChatInput({
                     }}
                     disabled={disabled || isStopping}
                     size="icon"
-                    variant="destructive"
+                    variant="default"
                     className="h-9 w-9 rounded-full"
                   >
                     {isStopping ? (
@@ -643,20 +649,33 @@ export function ChatInput({
                   <Button
                     type="button"
                     onClick={() => void handleSend()}
-                    disabled={disabled || isSending || !inputText.trim()}
+                    disabled={!sendEnabled}
                     size="icon"
-                    className="h-9 w-9 rounded-full"
+                    variant={sendEnabled ? 'default' : 'secondary'}
+                    className={cn(
+                      'h-9 w-9 rounded-full disabled:opacity-100',
+                      !sendEnabled &&
+                        'bg-muted text-foreground/70 hover:bg-muted dark:bg-muted/85 dark:text-foreground/80',
+                    )}
                   >
                     {isSending ? (
                       <Loader2 className="h-4 w-4 animate-spin" />
                     ) : (
-                      <Send className="h-4 w-4" />
+                      <ArrowUp
+                        className={cn(
+                          'h-4 w-4',
+                          sendEnabled ? 'text-primary-foreground' : 'text-current',
+                        )}
+                      />
                     )}
                     <span className="sr-only">{t('common.send')}</span>
                   </Button>
                 </TooltipTrigger>
                 <TooltipContent side="top" className="text-xs">
-                  {t('common.send')}
+                  <ShortcutTooltipContent
+                    label={t('common.send')}
+                    keys={['Enter']}
+                  />
                 </TooltipContent>
               </Tooltip>
             </TooltipProvider>

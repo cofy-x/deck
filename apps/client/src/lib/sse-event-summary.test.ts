@@ -42,7 +42,6 @@ function makeEvent<T extends Event['type']>(
 describe('shouldLogSseEvent', () => {
   const loggable: Array<Event['type']> = [
     'message.updated',
-    'message.part.updated',
     'session.status',
     'session.idle',
     'session.compacted',
@@ -57,6 +56,7 @@ describe('shouldLogSseEvent', () => {
   }
 
   const nonLoggable: Array<Event['type']> = [
+    'message.part.updated',
     'message.part.delta',
     'message.removed',
     'message.part.removed',

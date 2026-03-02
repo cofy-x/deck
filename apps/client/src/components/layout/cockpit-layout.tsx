@@ -26,6 +26,7 @@ import {
   ResizableHandle,
 } from '@/components/ui/resizable';
 import { Button } from '@/components/ui/button';
+import { ShortcutTooltipContent } from '@/components/ui/shortcut-tooltip-content';
 import { Separator } from '@/components/ui/separator';
 import {
   Tooltip,
@@ -443,16 +444,27 @@ export function CockpitLayout() {
 
             {panelVisibility === 'collapsed' && (
               <div className="pointer-events-none absolute inset-y-0 right-0 z-20 flex items-center pr-1">
-                <Button
-                  variant="outline"
-                  size="icon"
-                  onClick={expandPanel}
-                  className="pointer-events-auto h-8 w-6 rounded-md border-border/70 bg-background/95 shadow-xs"
-                  aria-label={t('panel.expand')}
-                  title={t('panel.expand')}
-                >
-                  <ChevronsLeft className="h-3.5 w-3.5" />
-                </Button>
+                <TooltipProvider delayDuration={200}>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button
+                        variant="outline"
+                        size="icon"
+                        onClick={expandPanel}
+                        className="pointer-events-auto h-8 w-6 rounded-md border-border/70 bg-background/95 shadow-xs"
+                        aria-label={t('panel.expand')}
+                      >
+                        <ChevronsLeft className="h-3.5 w-3.5" />
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent side="left" className="text-xs">
+                      <ShortcutTooltipContent
+                        label={t('panel.expand')}
+                        keys={['mod', '\\']}
+                      />
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
               </div>
             )}
           </>

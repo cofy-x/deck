@@ -3,7 +3,7 @@
  * Copyright 2026 cofy-x
  * SPDX-License-Identifier: Apache-2.0
  */
-import { useCallback, useEffect } from 'react';
+import { useCallback, useEffect, useMemo } from 'react';
 import {
   Monitor,
   PanelTop,
@@ -17,6 +17,13 @@ import {
 import { t } from '@/i18n';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
+import { ShortcutTooltipContent } from '@/components/ui/shortcut-tooltip-content';
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from '@/components/ui/tooltip';
 import { SandboxView } from '@/components/sandbox/sandbox-view';
 import { ContentViewer } from './content-viewer';
 import { LogViewer } from './log-viewer';
@@ -46,15 +53,24 @@ function FullscreenHeader({
         <Icon className="h-4 w-4" />
         {title}
       </div>
-      <Button
-        variant="ghost"
-        size="sm"
-        onClick={onClose}
-        className="h-7 w-7 p-0"
-      >
-        <X className="h-4 w-4" />
-        <span className="sr-only">{t('common.close')}</span>
-      </Button>
+      <TooltipProvider delayDuration={200}>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={onClose}
+              className="h-7 w-7 p-0"
+            >
+              <X className="h-4 w-4" />
+              <span className="sr-only">{t('common.close')}</span>
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent side="bottom" className="text-xs">
+            <ShortcutTooltipContent label={t('common.close')} keys={['Esc']} />
+          </TooltipContent>
+        </Tooltip>
+      </TooltipProvider>
     </div>
   );
 }
@@ -75,23 +91,51 @@ export function RightPanel() {
   const { endpoints, isRemote } = useActiveConnection();
   const opencodeBridge = useOpencodeWebBridge();
   const sandboxStatus = useSandboxState();
+  const shortcutCycleModes = useMemo<RightPanelMode[]>(
+    () => (debugEnabled ? ['desktop', 'viewer', 'log'] : ['desktop', 'viewer']),
+    [debugEnabled],
+  );
 
-  // Keyboard shortcut: Cmd/Ctrl + Shift + V to toggle desktop/viewer
+  // Keyboard shortcut: Cmd/Ctrl + Shift + V cycles right-panel tabs.
   useEffect(() => {
     if (sandboxStatus !== 'running') return;
     const handler = (e: KeyboardEvent) => {
       if ((e.metaKey || e.ctrlKey) && e.shiftKey && e.key.toLowerCase() === 'v') {
-        if (mode !== 'desktop' && mode !== 'viewer') return;
+        if (mode === 'opencode' || mode === 'terminal') return;
         e.preventDefault();
         if (panelVisibility === 'collapsed') {
           expandPanel();
         }
-        setMode(mode === 'desktop' ? 'viewer' : 'desktop');
+
+        // Clear lingering tab focus ring when switching via global shortcut.
+        const activeElement = document.activeElement;
+        if (
+          activeElement instanceof HTMLElement &&
+          activeElement.getAttribute('data-slot') === 'tabs-trigger'
+        ) {
+          activeElement.blur();
+        }
+
+        const currentIndex = shortcutCycleModes.indexOf(mode);
+        const nextMode =
+          shortcutCycleModes[
+            currentIndex >= 0
+              ? (currentIndex + 1) % shortcutCycleModes.length
+              : 0
+          ] ?? 'viewer';
+        setMode(nextMode);
       }
     };
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
-  }, [mode, setMode, panelVisibility, expandPanel, sandboxStatus]);
+  }, [
+    mode,
+    setMode,
+    panelVisibility,
+    expandPanel,
+    sandboxStatus,
+    shortcutCycleModes,
+  ]);
 
   // Escape exits fullscreen modes
   useEffect(() => {
@@ -216,11 +260,11 @@ export function RightPanel() {
 
     return (
       <div className="flex h-full flex-col">
-<FullscreenHeader
-            title={t('panel.terminal')}
-            icon={TerminalSquare}
-            onClose={exitFullscreen}
-          />
+        <FullscreenHeader
+          title={t('panel.terminal')}
+          icon={TerminalSquare}
+          onClose={exitFullscreen}
+        />
         <div className="min-h-0 flex-1 overflow-hidden">
           <iframe
             src={endpoints.webTerminalUrl}
@@ -238,34 +282,45 @@ export function RightPanel() {
     <div className="flex h-full flex-col">
       {/* Tab switcher */}
       <div className="flex h-11 shrink-0 items-center justify-between border-b px-3">
-        <Tabs value={mode} onValueChange={handleTabChange}>
-          <TabsList className="h-7">
-            <TabsTrigger value="desktop" className="h-6 gap-1 px-2 text-xs">
-              <Monitor className="h-3 w-3" />
-              {t('panel.desktop')}
-            </TabsTrigger>
-            <TabsTrigger value="viewer" className="h-6 gap-1 px-2 text-xs">
-              <PanelTop className="h-3 w-3" />
-              {t('panel.viewer')}
-            </TabsTrigger>
-            {debugEnabled && (
-              <TabsTrigger value="log" className="h-6 gap-1 px-2 text-xs">
-                <ScrollText className="h-3 w-3" />
-                {t('panel.log')}
+        <TooltipProvider delayDuration={200}>
+          <Tabs value={mode} onValueChange={handleTabChange}>
+            <TabsList className="h-7">
+              <TabsTrigger value="desktop" className="h-6 gap-1 px-2 text-xs">
+                <Monitor className="h-3 w-3" />
+                {t('panel.desktop')}
               </TabsTrigger>
-            )}
-          </TabsList>
-        </Tabs>
-        <Button
-          variant="ghost"
-          size="icon"
-          className="h-7 w-7"
-          onClick={collapsePanel}
-          title={t('panel.collapse')}
-        >
-          <ChevronsRight className="h-4 w-4" />
-          <span className="sr-only">{t('panel.collapse')}</span>
-        </Button>
+              <TabsTrigger value="viewer" className="h-6 gap-1 px-2 text-xs">
+                <PanelTop className="h-3 w-3" />
+                {t('panel.viewer')}
+              </TabsTrigger>
+              {debugEnabled && (
+                <TabsTrigger value="log" className="h-6 gap-1 px-2 text-xs">
+                  <ScrollText className="h-3 w-3" />
+                  {t('panel.log')}
+                </TabsTrigger>
+              )}
+            </TabsList>
+          </Tabs>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-7 w-7"
+                onClick={collapsePanel}
+              >
+                <ChevronsRight className="h-4 w-4" />
+                <span className="sr-only">{t('panel.collapse')}</span>
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent side="bottom" className="text-xs">
+              <ShortcutTooltipContent
+                label={t('panel.collapse')}
+                keys={['mod', '\\']}
+              />
+            </TooltipContent>
+          </Tooltip>
+        </TooltipProvider>
       </div>
 
       {/* Content area */}
