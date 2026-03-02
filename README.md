@@ -21,7 +21,8 @@
 
 > [!NOTE]
 > Deck is currently in **prerelease** (`v0.0.1`).
-> macOS builds may be unsigned / not notarized. See [install notes](#2-first-launch-on-macos) if Gatekeeper blocks the app.
+> Official desktop downloads are currently macOS DMG (signed and notarized).
+> Windows and Linux desktop builds are planned on the roadmap.
 
 ---
 
@@ -45,23 +46,18 @@
 
 ### 1. Install the app
 
-Download the latest prerelease from **[GitHub Releases](https://github.com/cofy-x/deck/releases)** and drag `deck.app` into `/Applications`.
+Download the latest prerelease macOS DMG from **[GitHub Releases](https://github.com/cofy-x/deck/releases)**, open it, and drag `deck.app` into `/Applications`.
 
-### 2. First launch on macOS
+Current desktop release assets are for macOS. Windows and Linux builds are on the roadmap.
 
-If macOS says the app is damaged or blocked:
-
-```bash
-xattr -dr com.apple.quarantine /Applications/deck.app
-open /Applications/deck.app
-```
-
-### 3. Start a sandbox
+### 2. Start a sandbox
 
 Open the app, select the built-in **Local** profile, and click **Start Sandbox**.
+
 The app will automatically pull `ghcr.io/cofy-x/deck/desktop-sandbox-ai:latest` on first run with a live progress indicator.
 
 > **Tip:** To pre-pull the image manually:
+>
 > ```bash
 > docker pull ghcr.io/cofy-x/deck/desktop-sandbox-ai:latest
 > ```

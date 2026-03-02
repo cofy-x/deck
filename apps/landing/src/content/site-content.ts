@@ -37,7 +37,7 @@ export const SITE_CONTENT: Record<Locale, SiteContent> = {
       trustChips: [
         'Open Source (Apache-2.0)',
         'Local-first orchestration',
-        'Docker sandbox runtime',
+        'Windows and Linux on roadmap',
       ],
     },
     demo: {
@@ -104,13 +104,15 @@ export const SITE_CONTENT: Record<Locale, SiteContent> = {
       steps: [
         {
           title: 'Install the desktop app',
-          command: 'Download deck.app from GitHub Releases and move it to /Applications.',
+          command:
+            'Download the macOS DMG from GitHub Releases, open it, and drag deck.app to /Applications.',
+          note:
+            'Desktop downloads are currently macOS. Windows and Linux builds are on the roadmap.',
         },
         {
           title: 'Start your first sandbox',
           command:
             'Open Deck, choose the Local profile, and click "Start Sandbox" to begin the first session.',
-          note: 'For macOS Gatekeeper warnings, check install notes in README.',
         },
       ],
     },
@@ -180,7 +182,7 @@ export const SITE_CONTENT: Record<Locale, SiteContent> = {
         { label: 'GitHub', href: GITHUB_URL, variant: 'secondary' },
         { label: '文档', href: DOCS_URL, variant: 'secondary' },
       ],
-      trustChips: ['Apache-2.0 开源', '本地优先编排', 'Docker 沙箱运行时'],
+      trustChips: ['Apache-2.0 开源', '本地优先编排', 'Windows / Linux 在路线图中'],
     },
     demo: {
       title: 'Deck 实际运行效果',
@@ -242,13 +244,14 @@ export const SITE_CONTENT: Record<Locale, SiteContent> = {
       steps: [
         {
           title: '安装桌面应用',
-          command: '从 GitHub Releases 下载 deck.app 并移动到 /Applications。',
+          command:
+            '从 GitHub Releases 下载 macOS DMG，打开后将 deck.app 拖入 /Applications。',
+          note: '当前桌面安装包为 macOS，Windows 与 Linux 版本已在路线图中。',
         },
         {
           title: '启动第一个沙箱',
           command:
             '打开 Deck，选择内置 Local 配置，点击 “Start Sandbox” 开始会话。',
-          note: '若遇到 macOS 安全限制，请参考 README 的安装说明。',
         },
       ],
     },

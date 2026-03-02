@@ -21,7 +21,8 @@
 
 > [!NOTE]
 > Deck 目前处于 **预发布** 阶段（`v0.0.1`）。
-> macOS 构建可能未签名/未公证。如果 Gatekeeper 阻止启动，请参阅[安装说明](#2-macos-首次启动)。
+> 当前桌面安装包为 macOS DMG（已签名并公证）。
+> Windows 和 Linux 桌面版本已在路线图中。
 
 ---
 
@@ -45,28 +46,23 @@
 
 ### 1. 安装应用
 
-从 **[GitHub Releases](https://github.com/cofy-x/deck/releases)** 下载最新的预发布 DMG，将 `deck.app` 拖入 `/Applications`。
+从 **[GitHub Releases](https://github.com/cofy-x/deck/releases)** 下载最新的预发布 macOS DMG，打开后将 `deck.app` 拖入 `/Applications`。
 
-### 2. macOS 首次启动
+当前桌面安装包以 macOS 为主，Windows 与 Linux 版本已在路线图中。
 
-如果 macOS 提示应用已损坏或被阻止：
-
-```bash
-xattr -dr com.apple.quarantine /Applications/deck.app
-open /Applications/deck.app
-```
-
-### 3. 启动沙箱
+### 2. 启动沙箱
 
 打开应用，选择内置的 **Local** 配置文件，点击 **Start Sandbox**。
+
 首次运行时应用会自动拉取 `ghcr.io/cofy-x/deck/desktop-sandbox-ai:latest` 镜像，并显示实时进度。
 
 > **提示：** 也可以提前手动拉取镜像：
+>
 > ```bash
 > docker pull ghcr.io/cofy-x/deck/desktop-sandbox-ai:latest
 > ```
 
-### 4. 本地沙盒数据持久化
+### 3. 本地沙盒数据持久化
 
 `apps/client` 的本地沙盒默认启用磁盘持久化，并在 Stop/Start 之间复用同一个容器：
 
@@ -131,14 +127,14 @@ graph LR
 
 ## 技术栈
 
-| 层级 | 技术 |
-| :--- | :--- |
-| 桌面应用 | Tauri v2, React, TypeScript, Vite, Tailwind CSS, shadcn/ui |
-| 沙箱运行时 | Go, Docker, noVNC, X11, supervisord |
-| AI 集成 | OpenCode, SSE 流式传输, MCP 工具服务器 |
-| 后端服务 | NestJS, Fastify, Drizzle ORM, PostgreSQL, Redis, BullMQ |
-| 消息桥接 | Node.js, 微信 / Telegram / Slack / 飞书 / Discord / 钉钉 / 邮件 |
-| 构建工具 | pnpm, Cargo, Go 工作区, uv, Makefile |
+| 层级       | 技术                                                            |
+| :--------- | :-------------------------------------------------------------- |
+| 桌面应用   | Tauri v2, React, TypeScript, Vite, Tailwind CSS, shadcn/ui      |
+| 沙箱运行时 | Go, Docker, noVNC, X11, supervisord                             |
+| AI 集成    | OpenCode, SSE 流式传输, MCP 工具服务器                          |
+| 后端服务   | NestJS, Fastify, Drizzle ORM, PostgreSQL, Redis, BullMQ         |
+| 消息桥接   | Node.js, 微信 / Telegram / Slack / 飞书 / Discord / 钉钉 / 邮件 |
+| 构建工具   | pnpm, Cargo, Go 工作区, uv, Makefile                            |
 
 ---
 

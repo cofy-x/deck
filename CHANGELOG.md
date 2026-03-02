@@ -7,6 +7,14 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+## [0.0.1-alpha.6] - 2026-03-02
+
+### Changed
+
+- Updated release messaging in `README.md` and `README.zh-CN.md` to reflect the current macOS desktop distribution status and the Windows/Linux roadmap.
+- Updated `apps/landing/src/content/site-content.ts` (EN/ZH) to align quick-start copy and trust chips with current platform availability messaging.
+- Updated `docs/design/client-update-check.md` to replace outdated unsigned-DMG assumptions with the signed/notarized macOS release workflow status.
+
 ## [0.0.1-alpha.3.4] - 2026-03-02
 
 ### Added

@@ -45,6 +45,7 @@ Phase 2 is intentionally scoped to `apps/pilot/server` and does not require `app
 All new write routes require `client` auth and approval gate (same as existing bridge routes).
 
 1. `POST /workspace/:id/bridge/feishu-webhook`
+
 - Body:
   - `webhookUrl` required string
   - `verificationToken` optional string
@@ -53,12 +54,14 @@ All new write routes require `client` auth and approval gate (same as existing b
   - `enabled` optional boolean (default `true`)
 
 2. `POST /workspace/:id/bridge/discord-token`
+
 - Body:
   - `token` required string
   - `mentionInGuilds` optional boolean (default `true`)
   - `enabled` optional boolean (default `true`)
 
 3. `POST /workspace/:id/bridge/dingtalk-webhook`
+
 - Body:
   - `webhookUrl` required string
   - `verificationToken` optional string
@@ -67,6 +70,7 @@ All new write routes require `client` auth and approval gate (same as existing b
   - `enabled` optional boolean (default `true`)
 
 4. `POST /workspace/:id/bridge/email-credentials`
+
 - Body:
   - `imapHost` required string
   - `imapPort` optional number (1..65535, default `993`)
@@ -86,6 +90,7 @@ All new write routes require `client` auth and approval gate (same as existing b
   - `enabled` optional boolean (default `true`)
 
 5. `POST /workspace/:id/bridge/mochat-token`
+
 - Body:
   - `clawToken` required string
   - `baseUrl` optional string (default `https://mochat.io`)
@@ -96,6 +101,7 @@ All new write routes require `client` auth and approval gate (same as existing b
   - `enabled` optional boolean (default `true`)
 
 6. `POST /workspace/:id/bridge/qq-api`
+
 - Body:
   - `apiBaseUrl` required string
   - `accessToken` optional string
@@ -104,6 +110,7 @@ All new write routes require `client` auth and approval gate (same as existing b
   - `enabled` optional boolean (default `true`)
 
 7. `GET /workspace/:id/bridge/health` (read-only proxy)
+
 - Query:
   - `healthPort` optional number override (same semantics as existing write routes)
 - Response:
@@ -122,20 +129,22 @@ All new write routes require `client` auth and approval gate (same as existing b
 
 ## Internal Design Decisions
 
-### 1) Config Update Path
+### 1. Config Update Path
 
 For new channels, `pilot-server` writes `bridge.json` directly (same path resolved by `resolveBridgeConfigPath()`), because bridge health-server currently exposes mutating endpoints only for Telegram/Slack/groups.
 
 Implementation details:
+
 - Read existing `bridge.json` if present; otherwise create a minimal default:
   - `{ "version": 1, "channels": {} }`
 - Merge updates into `channels.<channel>` only.
 - Preserve unrelated top-level and channel fields.
 - Write atomically via temp file + rename.
 
-### 2) Approval and Audit
+### 2. Approval and Audit
 
 Each new route must:
+
 - call `requireApproval(...)` before update
 - emit `recordAudit(...)` with stable action/target names:
   - `bridge.feishu.set-webhook`
@@ -145,9 +154,10 @@ Each new route must:
   - `bridge.mochat.set-token`
   - `bridge.qq.set-api`
 
-### 3) Health Proxy
+### 3. Health Proxy
 
 Add `fetchBridgeHealth(...)` in `bridge.service.ts`:
+
 - GET `http://{host}:{port}/health`
 - normalize payload to 9 channels
 - return structured JSON object
@@ -155,17 +165,19 @@ Add `fetchBridgeHealth(...)` in `bridge.service.ts`:
   - `bridge_unreachable`
   - `bridge_request_failed`
 
-### 4) Validation Rules
+### 4. Validation Rules
 
 Validation uses explicit typed guards and parser helpers (no `any`/`unknown`):
+
 - required strings must be non-empty after trim
 - numeric ports must be integer in `1..65535`
 - intervals and limits must satisfy minimum constraints above
 - array fields (`sessions`) must be array of non-empty strings
 
-### 5) DRY Structure
+### 5. DRY Structure
 
 Use route-local helper factories to reduce repetition:
+
 - `resolveBridgeWriteContext(...)`
 - `requireBridgeApprovalAndAudit(...)`
 - `normalizeBridgePort(...)`
@@ -174,20 +186,24 @@ Use route-local helper factories to reduce repetition:
 ## File-Level Implementation Plan
 
 1. `apps/pilot/server/src/services/bridge.service.ts`
+
 - add typed bridge config read/merge/write helpers
 - add channel-specific write functions for six new adapters
 - add bridge health fetch + normalize function
 - keep existing Telegram/Slack functions intact
 
 2. `apps/pilot/server/src/routes/bridge.routes.ts`
+
 - register six new POST routes
 - register one new GET health route
 - use shared helpers for approval/audit/error mapping
 
 3. `apps/pilot/server/README.md`
+
 - add new bridge endpoints and brief route purpose notes
 
 4. `apps/pilot/server/src/types/*` (if required)
+
 - add strongly typed interfaces for new route payloads/responses
 
 ## Test Plan
@@ -195,11 +211,13 @@ Use route-local helper factories to reduce repetition:
 ### Unit Tests
 
 1. `bridge.service` config merge tests
+
 - creates default config when file missing
 - merges channel config without clobbering unrelated fields
 - validates and rejects malformed payload values
 
 2. `bridge.service` health normalize tests
+
 - parses full 9-channel health payload
 - parses legacy 3-channel health payload and fills missing channels as `false`
 - throws for invalid schema (wrong field types)
@@ -207,12 +225,14 @@ Use route-local helper factories to reduce repetition:
 ### Route Tests
 
 1. New POST routes
+
 - missing required fields -> `400`
 - approval denied -> `403`
 - successful write -> `200`, `requiresRestart: true`
 - audit record action/target correctness
 
 2. New GET `/workspace/:id/bridge/health`
+
 - healthy bridge response passthrough with normalization
 - bridge unreachable -> `502 bridge_unreachable`
 - non-2xx bridge response -> mapped `bridge_request_failed`
@@ -230,6 +250,7 @@ Use route-local helper factories to reduce repetition:
 1. Land server changes behind additive routes only.
 2. Update docs and communicate new endpoints to client/automation maintainers.
 3. Optional Phase 3:
+
 - extend bridge health-server with live config endpoints for new channels
 - switch new server write routes from config-file patch to live apply where available
 
