@@ -35,14 +35,14 @@ is needed because:
 
 The Tauri updater plugin (`tauri-plugin-updater`) requires:
 
-1. **Code-signed builds** — the CI currently produces unsigned DMGs.
-2. **Update manifests** (`latest.json`) generated and hosted alongside
-   release assets.
-3. **Rust-side plugin registration** and `tauri.conf.json` updater config.
+1. **Code-signed builds** — the CI release workflow now produces signed and notarized macOS DMGs.
+1. **Update manifests** (`latest.json`) generated and hosted alongside release assets.
+1. **Rust-side plugin registration** and `tauri.conf.json` updater config.
 
-None of these prerequisites are in place yet. A simple "check and redirect"
-pattern is sufficient for the alpha stage where release frequency is low and
-the user base is small.
+Signing prerequisites are now in place, but updater manifests and plugin
+integration are not in place yet. A simple "check and redirect" pattern
+remains sufficient for the current alpha stage where release frequency is low
+and the user base is small.
 
 ### How it works
 
@@ -80,12 +80,10 @@ seamless in-app updates:
 
 ### Prerequisites
 
-- [ ] Apple Developer code signing configured in CI.
-- [ ] CI generates Tauri update manifests (`latest.json`) alongside DMG
-      assets in the GitHub release.
+- [x] Apple Developer code signing configured in CI.
+- [ ] CI generates Tauri update manifests (`latest.json`) alongside DMG assets in the GitHub release.
 - [ ] Windows builds added (requires Authenticode signing for updater).
-- [ ] `tauri-plugin-updater` added to `Cargo.toml` and registered in
-      `lib.rs`.
+- [ ] `tauri-plugin-updater` added to `Cargo.toml` and registered in `lib.rs`.
 - [ ] `tauri.conf.json` updater section configured with the endpoint URL.
 
 ### Migration steps
@@ -93,20 +91,14 @@ seamless in-app updates:
 1. Add `tauri-plugin-updater` to `apps/client/src-tauri/Cargo.toml`.
 2. Register the plugin in `apps/client/src-tauri/src/lib.rs`.
 3. Add updater configuration to `apps/client/src-tauri/tauri.conf.json`.
-4. Update `apps/client/src-tauri/capabilities/default.json` with updater
-   permissions.
+4. Update `apps/client/src-tauri/capabilities/default.json` with updater permissions.
 5. Update CI workflow (`.github/workflows/client-release.yml`) to:
-   - Sign builds with Apple Developer certificate.
    - Generate and upload `latest.json` manifest.
-6. Replace the frontend GitHub API check with the Tauri updater JS API
-   (`@tauri-apps/plugin-updater`, already removed from `package.json` —
-   re-add when ready).
-7. Keep the Settings About section but wire it to the native updater
-   progress instead of a browser redirect.
+6. Replace the frontend GitHub API check with the Tauri updater JS API (`@tauri-apps/plugin-updater`, already removed from `package.json` — re-add when ready).
+7. Keep the Settings About section but wire it to the native updater progress instead of a browser redirect.
 
 ### Cleanup on migration
 
 - Remove `apps/client/src/lib/update-check.ts` (GitHub API fetch logic).
-- Remove `UPDATE_DISMISSED_KEY` from `constants.ts` (native updater handles
-  this).
+- Remove `UPDATE_DISMISSED_KEY` from `constants.ts` (native updater handles this).
 - Simplify `use-update-check.ts` to wrap the Tauri updater API.
