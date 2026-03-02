@@ -703,8 +703,8 @@ export function MessageItem({
             {/* Collapsible steps section */}
             {hasSteps && (
               <Collapsible open={stepsExpanded} onOpenChange={setStepsExpanded}>
-                <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
-                  <CollapsibleTrigger className="flex items-center gap-1 rounded-sm px-1.5 py-0.5 transition-colors hover:bg-muted/40">
+                <div className="flex items-center gap-1.5 text-[11px] text-foreground/75">
+                  <CollapsibleTrigger className="flex items-center gap-1 rounded-sm px-1.5 py-0.5 transition-colors hover:bg-muted/45">
                     {stepsExpanded ? (
                       <ChevronDown className="h-3 w-3" />
                     ) : (
@@ -717,7 +717,7 @@ export function MessageItem({
                   <button
                     type="button"
                     onClick={handleToggleChildSteps}
-                    className="inline-flex h-5 w-5 items-center justify-center rounded-sm text-muted-foreground transition-colors hover:bg-muted/40"
+                    className="inline-flex h-5 w-5 items-center justify-center rounded-sm text-foreground/75 transition-colors hover:bg-muted/45"
                     title={
                       childExpandOpen
                         ? t('message.collapse_child_steps')
@@ -728,7 +728,7 @@ export function MessageItem({
                   </button>
                 </div>
                 <CollapsibleContent>
-                  <div className="mt-1.5 flex flex-col gap-1.5 rounded-md border border-border/50 bg-muted/15 p-2">
+                  <div className="mt-1.5 flex flex-col gap-1.5 rounded-md border border-border/70 bg-muted/25 p-2">
                     {stepParts.map((part) => (
                       <PartRenderer
                         key={part.id}
@@ -744,7 +744,7 @@ export function MessageItem({
 
             {/* Text parts merged to preserve markdown fence continuity. */}
             {mergedAssistantText.trim().length > 0 && (
-              <MarkdownRenderer content={mergedAssistantText} />
+              <MarkdownRenderer content={mergedAssistantText} tone="high-contrast" />
             )}
           </div>
         )}

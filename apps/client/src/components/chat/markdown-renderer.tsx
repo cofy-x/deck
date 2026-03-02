@@ -10,6 +10,7 @@ import remarkGfm from 'remark-gfm';
 import { Copy, Maximize2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { highlightCode } from '@/lib/shiki';
+import { normalizeMarkdown } from '@/lib/markdown-normalize';
 import { useViewerStore } from '@/stores/viewer-store';
 import { cn } from '@/lib/utils';
 
@@ -89,128 +90,144 @@ function CodeBlock({ language, code }: { language: string; code: string }) {
 // Custom react-markdown component overrides
 // ---------------------------------------------------------------------------
 
-const markdownComponents: Components = {
-  // Fenced code blocks
-  code({ className, children, ...rest }) {
-    const match = /language-(\w+)/.exec(className ?? '');
-    const codeString = String(children).replace(/\n$/, '');
-    const isBlockCode = Boolean(match) || codeString.includes('\n');
+export type MarkdownTone = 'default' | 'high-contrast';
 
-    // Block code (fenced or multiline fallback)
-    if (isBlockCode) {
+function buildMarkdownComponents(tone: MarkdownTone): Components {
+  const contentTextClass =
+    tone === 'high-contrast' ? 'text-foreground' : 'text-foreground/90';
+
+  return {
+    // Fenced code blocks
+    code({ className, children, ...rest }) {
+      const match = /language-(\w+)/.exec(className ?? '');
+      const codeString = String(children).replace(/\n$/, '');
+      const isBlockCode = Boolean(match) || codeString.includes('\n');
+
+      // Block code (fenced or multiline fallback)
+      if (isBlockCode) {
+        return (
+          <CodeBlock language={match?.[1] ?? 'plaintext'} code={codeString} />
+        );
+      }
+
+      // Inline code
       return (
-        <CodeBlock language={match?.[1] ?? 'plaintext'} code={codeString} />
+        <code
+          className={cn(
+            'rounded-md border border-border/60 bg-muted/55 px-1.5 py-0.5 font-mono text-[0.85em]',
+            contentTextClass,
+            className,
+          )}
+          {...rest}
+        >
+          {children}
+        </code>
       );
-    }
+    },
 
-    // Inline code
-    return (
-      <code
-        className={cn(
-          'rounded-md border border-border/60 bg-muted/55 px-1.5 py-0.5 font-mono text-[0.85em] text-foreground/90',
-          className,
-        )}
-        {...rest}
-      >
-        {children}
-      </code>
-    );
-  },
+    // Override <pre> to avoid double-wrapping with CodeBlock
+    pre({ children }) {
+      return <>{children}</>;
+    },
 
-  // Override <pre> to avoid double-wrapping with CodeBlock
-  pre({ children }) {
-    return <>{children}</>;
-  },
+    // Tables
+    table({ children }) {
+      return (
+        <div className="my-2 overflow-x-auto rounded-md border">
+          <table className="w-full text-sm">{children}</table>
+        </div>
+      );
+    },
+    thead({ children }) {
+      return <thead className="bg-muted/50">{children}</thead>;
+    },
+    th({ children }) {
+      return (
+        <th className="border-b px-3 py-1.5 text-left text-xs font-semibold">
+          {children}
+        </th>
+      );
+    },
+    td({ children }) {
+      return <td className="border-b px-3 py-1.5 text-xs">{children}</td>;
+    },
 
-  // Tables
-  table({ children }) {
-    return (
-      <div className="my-2 overflow-x-auto rounded-md border">
-        <table className="w-full text-sm">{children}</table>
-      </div>
-    );
-  },
-  thead({ children }) {
-    return <thead className="bg-muted/50">{children}</thead>;
-  },
-  th({ children }) {
-    return (
-      <th className="border-b px-3 py-1.5 text-left text-xs font-semibold">
-        {children}
-      </th>
-    );
-  },
-  td({ children }) {
-    return <td className="border-b px-3 py-1.5 text-xs">{children}</td>;
-  },
+    // Links
+    a({ href, children }) {
+      return (
+        <a
+          href={href}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="text-primary underline underline-offset-2 hover:text-primary/80"
+        >
+          {children}
+        </a>
+      );
+    },
 
-  // Links
-  a({ href, children }) {
-    return (
-      <a
-        href={href}
-        target="_blank"
-        rel="noopener noreferrer"
-        className="text-primary underline underline-offset-2 hover:text-primary/80"
-      >
-        {children}
-      </a>
-    );
-  },
+    // Blockquotes
+    blockquote({ children }) {
+      return (
+        <blockquote className="my-2 border-l-2 border-primary/50 pl-3 text-muted-foreground italic">
+          {children}
+        </blockquote>
+      );
+    },
 
-  // Blockquotes
-  blockquote({ children }) {
-    return (
-      <blockquote className="my-2 border-l-2 border-primary/50 pl-3 text-muted-foreground italic">
-        {children}
-      </blockquote>
-    );
-  },
+    // Lists
+    ul({ children }) {
+      return <ul className="my-1.5 list-inside list-disc pl-2">{children}</ul>;
+    },
+    ol({ children }) {
+      return <ol className="my-1.5 list-inside list-decimal pl-2">{children}</ol>;
+    },
+    li({ children }) {
+      return (
+        <li className={cn('my-0.5 text-[15px] leading-7', contentTextClass)}>
+          {children}
+        </li>
+      );
+    },
 
-  // Lists
-  ul({ children }) {
-    return <ul className="my-1.5 list-inside list-disc pl-2">{children}</ul>;
-  },
-  ol({ children }) {
-    return <ol className="my-1.5 list-inside list-decimal pl-2">{children}</ol>;
-  },
-  li({ children }) {
-    return <li className="my-0.5 leading-7 text-[15px] text-foreground/90">{children}</li>;
-  },
+    // Paragraphs
+    p({ children }) {
+      return (
+        <p className={cn('my-1.5 wrap-break-word text-[15px] leading-7', contentTextClass)}>
+          {children}
+        </p>
+      );
+    },
 
-  // Paragraphs
-  p({ children }) {
-    return <p className="my-1.5 wrap-break-word text-[15px] leading-7 text-foreground/90">{children}</p>;
-  },
+    // Headings
+    h1({ children }) {
+      return <h1 className="my-2 text-lg font-semibold tracking-tight text-foreground">{children}</h1>;
+    },
+    h2({ children }) {
+      return <h2 className="my-2 text-base font-semibold tracking-tight text-foreground">{children}</h2>;
+    },
+    h3({ children }) {
+      return <h3 className="my-1.5 text-sm font-semibold text-foreground">{children}</h3>;
+    },
 
-  // Headings
-  h1({ children }) {
-    return <h1 className="my-2 text-lg font-semibold tracking-tight text-foreground">{children}</h1>;
-  },
-  h2({ children }) {
-    return <h2 className="my-2 text-base font-semibold tracking-tight text-foreground">{children}</h2>;
-  },
-  h3({ children }) {
-    return <h3 className="my-1.5 text-sm font-semibold text-foreground">{children}</h3>;
-  },
+    // Horizontal rule
+    hr() {
+      return <hr className="my-3 border-border" />;
+    },
 
-  // Horizontal rule
-  hr() {
-    return <hr className="my-3 border-border" />;
-  },
-
-  // Images
-  img({ src, alt }) {
-    return (
-      <img
-        src={src}
-        alt={alt ?? ''}
-        className="my-2 max-w-full rounded-md border"
-        loading="lazy"
-      />
-    );
-  },
-};
+    // Images
+    img({ src, alt }) {
+      return (
+        <img
+          src={src}
+          alt={alt ?? ''}
+          className="my-2 max-w-full rounded-md border"
+          loading="lazy"
+        />
+      );
+    },
+  };
+}
 
 // ---------------------------------------------------------------------------
 // Exported component
@@ -221,63 +238,8 @@ export interface MarkdownRendererProps {
   content: string;
   /** Additional CSS classes on the wrapper. */
   className?: string;
-}
-
-function normalizeMarkdown(content: string): string {
-  const lines = content.split('\n');
-
-  // Fix nested fences inside ```md / ```markdown snippets.
-  // Pattern handled:
-  // ```md
-  // ...
-  // ```ts
-  // ...
-  // ```   <- should be nested code close, not outer md close
-  // ```   <- intended outer md close
-  for (let i = 0; i < lines.length; i += 1) {
-    const openMd = lines[i]?.match(/^\s*```(?:md|markdown)\s*$/i);
-    if (!openMd) continue;
-
-    let firstClose = -1;
-    for (let j = i + 1; j < lines.length; j += 1) {
-      if (/^\s*```\s*$/.test(lines[j] ?? '')) {
-        firstClose = j;
-        break;
-      }
-    }
-    if (firstClose < 0) continue;
-
-    const hasNestedFenceOpen = lines
-      .slice(i + 1, firstClose)
-      .some((line) => /^\s*```[a-z0-9_-]+\s*$/i.test(line));
-    const hasSecondClose = /^\s*```\s*$/.test(lines[firstClose + 1] ?? '');
-
-    if (hasNestedFenceOpen && hasSecondClose) {
-      // Insert a zero-width space so this line is rendered literally instead
-      // of closing the outer markdown code block.
-      lines[firstClose] = (lines[firstClose] ?? '').replace(/```/, '\u200b```');
-    }
-  }
-
-  const normalized = lines.join('\n');
-
-  // Auto-close unbalanced fenced code blocks so the rest of the message
-  // doesn't get swallowed into one giant code section.
-  const normalizedLines = normalized.split('\n');
-  let inFence = false;
-  for (const line of normalizedLines) {
-    if (!inFence) {
-      if (/^\s*```/.test(line)) {
-        inFence = true;
-      }
-      continue;
-    }
-    if (/^\s*```\s*$/.test(line)) {
-      inFence = false;
-    }
-  }
-  if (!inFence) return normalized;
-  return `${normalized}\n\`\`\`\n`;
+  /** Text contrast profile for markdown content. */
+  tone?: MarkdownTone;
 }
 
 /**
@@ -286,18 +248,20 @@ function normalizeMarkdown(content: string): string {
  * actions.
  */
 export const MarkdownRenderer = memo(
-  ({ content, className }: MarkdownRendererProps) => {
+  ({ content, className, tone = 'default' }: MarkdownRendererProps) => {
     const normalized = useMemo(() => normalizeMarkdown(content), [content]);
+    const components = useMemo(() => buildMarkdownComponents(tone), [tone]);
     return (
       <div
         className={cn(
-          'prose-sm max-w-full overflow-hidden wrap-break-word text-foreground/90',
+          'prose-sm max-w-full overflow-hidden wrap-break-word',
+          tone === 'high-contrast' ? 'text-foreground' : 'text-foreground/90',
           className,
         )}
       >
         <ReactMarkdown
           remarkPlugins={[remarkGfm]}
-          components={markdownComponents}
+          components={components}
         >
           {normalized}
         </ReactMarkdown>
