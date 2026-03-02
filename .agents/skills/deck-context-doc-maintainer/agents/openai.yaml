@@ -1,0 +1,4 @@
+interface:
+  display_name: "Deck Context Docs"
+  short_description: "Audit and align AGENTS/.x docs with repo truth."
+  default_prompt: "Use $deck-context-doc-maintainer to audit AGENTS.md and .x docs against current repository state, then apply concise, evidence-backed updates."

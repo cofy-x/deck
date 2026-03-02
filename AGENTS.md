@@ -14,12 +14,13 @@ Read the documents in the `.x/` directory in the following order:
 
 | Area | Read |
 | :--- | :--- |
-| Any React/TS frontend app | [.x/guide-frontend.md](.x/guide-frontend.md) |
+| Shared React/TS frontend patterns (`apps/client`, `apps/dashboard`) | [.x/guide-frontend.md](.x/guide-frontend.md) |
 | `apps/client` (Tauri desktop) | [.x/guide-client.md](.x/guide-client.md) |
 | `apps/client` chat retry / attachment compatibility | [docs/design/client-chat-retry.md](docs/design/client-chat-retry.md) |
 | `apps/client` remote OpenCode web auth bridge | [docs/design/client-remote-opencode-web-auth.md](docs/design/client-remote-opencode-web-auth.md) |
 | `apps/api` (NestJS BFF) | [.x/guide-api.md](.x/guide-api.md) |
 | `apps/dashboard` (React web admin) | [.x/guide-dashboard.md](.x/guide-dashboard.md) |
+| `apps/landing` (marketing website) | [.x/guide-landing.md](.x/guide-landing.md) |
 | `apps/pilot/*` (Pilot suite) | [.x/guide-pilot.md](.x/guide-pilot.md) |
 | `apps/pilot/*` architecture and flows | [docs/design/pilot/README.md](docs/design/pilot/README.md), [docs/design/pilot/host.md](docs/design/pilot/host.md), [docs/design/pilot/bridge.md](docs/design/pilot/bridge.md), [docs/design/pilot/server.md](docs/design/pilot/server.md) |
 | `apps/server-py` and `packages/core-py` | [.x/guide-python.md](.x/guide-python.md) |
@@ -27,7 +28,7 @@ Read the documents in the `.x/` directory in the following order:
 | `apps/cli`, `packages/daemon`, `packages/computer-use` | [.x/guide-runtime-go.md](.x/guide-runtime-go.md), [apps/cli/README.md](apps/cli/README.md) |
 | Daemon / sandbox containers | [docs/design/daemon.md](docs/design/daemon.md), [docker/desktop/sandbox-ai/README.md](docker/desktop/sandbox-ai/README.md), [docker/cli/README.md](docker/cli/README.md) |
 | Module lifecycle / status map | [.x/module-status.md](.x/module-status.md) |
-| v0.1 feature specs | [.x/v0.1/README.md](.x/v0.1/README.md) |
+| v0.1 feature specs (historical-only context) | [.x/v0.1/README.md](.x/v0.1/README.md) |
 
 ## Key Rules
 

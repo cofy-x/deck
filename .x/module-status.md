@@ -20,7 +20,7 @@ Status definitions:
 | `apps/server-go` | `PLACEHOLDER` | `none` | [apps/server-go/README.md](../apps/server-go/README.md) | Reserved directory, no runtime code yet. |
 | `apps/server-py` | `PLACEHOLDER` | `uv` | [apps/server-py/README.md](../apps/server-py/README.md) | Python placeholder service used for workspace bootstrap only. |
 | `packages/client-daemon-go` | `GENERATED` | `go.work` | [packages/client-daemon-go/daemon/README.md](../packages/client-daemon-go/daemon/README.md) | Go SDK and generated API docs from daemon Swagger. |
-| `packages/client-daemon-ts` | `ACTIVE` | `pnpm` | [packages/client-daemon-ts/README.md](../packages/client-daemon-ts/README.md) | TypeScript SDK consumed by `apps/client`. |
+| `packages/client-daemon-ts` | `GENERATED` | `pnpm` | [packages/client-daemon-ts/README.md](../packages/client-daemon-ts/README.md) | TypeScript SDK consumed by `apps/client`; regenerate from daemon Swagger and avoid manual edits in generated surfaces. |
 | `packages/computer-use` | `ACTIVE` | `go.work` | [packages/computer-use/README.md](../packages/computer-use/README.md) | Desktop automation plugin for daemon. |
 | `packages/core-go` | `ACTIVE` | `go.work` | [packages/core-go/README.md](../packages/core-go/README.md) | Shared Go utilities used by daemon and CLI. |
 | `packages/core-py` | `PLACEHOLDER` | `uv` | [packages/core-py/README.md](../packages/core-py/README.md) | Python shared package scaffold. |
