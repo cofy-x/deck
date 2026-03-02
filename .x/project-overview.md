@@ -6,7 +6,7 @@
 
 | Language | Manager | Config File | Workspace Members |
 | :--- | :--- | :--- | :--- |
-| Node.js / TypeScript | `pnpm` | `pnpm-workspace.yaml` | apps/api, apps/dashboard, apps/landing, apps/client, apps/pilot/*, packages/core-ts, packages/client-daemon-ts |
+| Node.js / TypeScript | `pnpm` | `pnpm-workspace.yaml` | apps/api, apps/dashboard, apps/landing, apps/client, apps/pilot/*, packages/core-ts, packages/client-daemon-ts, examples/daemon |
 | Python | `uv` | `pyproject.toml` | apps/server-py, packages/core-py |
 | Go | `go work` | `go.work` | apps/cli, packages/daemon, packages/core-go, packages/computer-use, packages/client-daemon-go |
 | Rust | `cargo` | `apps/client/src-tauri/Cargo.toml` | Tauri backends |
@@ -63,7 +63,7 @@ deck/
 │
 ├── scripts/                       # Build and codegen scripts (JS)
 ├── hack/                          # One-off setup scripts
-└── examples/                      # Example configs (placeholder)
+└── examples/                      # Example packages and integration demos
 ```
 
 Use `.x/module-status.md` as the lifecycle source of truth (`ACTIVE`, `PLACEHOLDER`, `HISTORICAL`, `GENERATED`).

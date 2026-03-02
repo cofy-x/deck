@@ -1,10 +1,24 @@
 # Frontend Development Guide
 
-Shared conventions for all React/TypeScript frontend applications in the deck monorepo.
+Shared conventions for TanStack-based React/TypeScript frontend applications in the deck monorepo.
 
-**Applies to:** `apps/client`, `apps/dashboard`, `apps/landing`
+**Applies to:** `apps/client`, `apps/dashboard`
+
+For landing-site conventions, use [guide-landing.md](./guide-landing.md).
+
+## Applicability Matrix
+
+| Rule Area | `apps/client` | `apps/dashboard` | `apps/landing` |
+| :--- | :--- | :--- | :--- |
+| TanStack Router | Required | Required | Not used by default |
+| TanStack Query | Required | Required | Not used by default |
+| Zustand stores | Required for app state | Used for selected UI state | Avoid by default (prefer local component state) |
+| Generated API client integration | OpenCode SDK + daemon SDK | Orval + Axios | Not used by default |
+| Dedicated guide | [guide-client.md](./guide-client.md) | [guide-dashboard.md](./guide-dashboard.md) | [guide-landing.md](./guide-landing.md) |
 
 ## Tech Stack
+
+Shared stack for `apps/client` and `apps/dashboard`:
 
 | Category | Technology | Version | Purpose |
 | :--- | :--- | :--- | :--- |
@@ -21,6 +35,8 @@ Shared conventions for all React/TypeScript frontend applications in the deck mo
 | Validation | Zod | v4 | Schema validation (forms + API) |
 
 ## Component Architecture
+
+The structure below describes TanStack-based frontend apps (`client` and `dashboard`).
 
 ### Structure
 
@@ -57,6 +73,8 @@ src/
 
 ## State Management
 
+This section applies to `client` and `dashboard`.
+
 ```mermaid
 sequenceDiagram
     participant Backend as Backend/API
@@ -72,15 +90,17 @@ sequenceDiagram
 
 - **Server state** → **TanStack Query** — For any data from backend/API.
 - **Client UI state** → **Zustand** — For ephemeral UI state (sidebar toggle, user preferences, search input).
-- Never use `useEffect` for data fetching. Use TanStack Query hooks.
+- Never use `useEffect` for backend data fetching. Use TanStack Query hooks.
 
 ## Type Safety
 
-- **Routes** — All navigation must use `Link` or `useNavigate` from TanStack Router.
+- **Routes** — In TanStack Router apps, all navigation must use `Link` or `useNavigate`.
 - **Forms** — Use React Hook Form with Zod resolver.
-- **API clients** — Use generated hooks (Orval for dashboard, SDK for client).
+- **API clients** — Use generated clients (Orval for dashboard, SDK for client).
 
 ## Content Rendering (Markdown)
+
+When an app requires markdown rendering:
 
 - **Stack:** `react-markdown` + `remark-gfm` + `shiki`
 - **Styling:** Use `@tailwindcss/typography` (`prose` class) for document flow.
@@ -88,13 +108,12 @@ sequenceDiagram
 
 ## App-Specific Differences
 
-| Feature | `apps/client` | `apps/dashboard` |
-| :--- | :--- | :--- |
-| Shell | Tauri v2 (Desktop) | Browser SPA |
-| Backend | Rust + Daemon SDK | NestJS API (Axios/Orval) |
-| HTTP Client | Tauri HTTP plugin | Axios |
-| API Gen | — | Orval (OpenAPI) |
-| Notifications | — | Sonner |
-| i18n | — | — |
+| Feature | `apps/client` | `apps/dashboard` | `apps/landing` |
+| :--- | :--- | :--- | :--- |
+| Shell | Tauri v2 (Desktop) | Browser SPA | Browser SPA |
+| Routing | TanStack Router | TanStack Router | Section anchors / direct links |
+| Server data model | TanStack Query + OpenCode SDK | TanStack Query + Axios/Orval | Static/local content by default |
+| Client state model | Zustand stores + query cache | Zustand + query cache | Local component state by default |
+| Primary purpose | Desktop cockpit and sandbox operations | Admin and API operations | Marketing and product communication |
 
-> For app-specific details, see [guide-client.md](./guide-client.md) and [guide-dashboard.md](./guide-dashboard.md).
+For app-specific details, see [guide-client.md](./guide-client.md), [guide-dashboard.md](./guide-dashboard.md), and [guide-landing.md](./guide-landing.md).

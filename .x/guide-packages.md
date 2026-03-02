@@ -12,7 +12,7 @@ This guide maps shared package responsibilities and expected usage patterns.
 ## Entrypoints
 
 - TypeScript shared core: `packages/core-ts`
-- TypeScript daemon SDK: `packages/client-daemon-ts`
+- TypeScript daemon SDK (generated): `packages/client-daemon-ts`
 - Go shared core: `packages/core-go`
 - Daemon runtime package: `packages/daemon`
 - Python shared core: `packages/core-py` (placeholder)
@@ -53,4 +53,5 @@ make test-go
 ## Common Pitfalls
 
 - Do not import generated artifacts from `dist/` as sources for manual edits.
+- `packages/client-daemon-ts` is generated from daemon Swagger. Prefer regeneration (`pnpm --filter @cofy-x/client-daemon run generate`) over manual edits; if manual edits are unavoidable, update the generator workflow in the same change.
 - Check `.x/module-status.md` before extending placeholder packages (`hooks`, `ui`, `core-py`).

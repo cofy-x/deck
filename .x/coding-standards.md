@@ -25,17 +25,18 @@ Rules and conventions for AI agents and developers working on the deck monorepo.
 - **Strict mode** enabled (`noImplicitAny`, `strictNullChecks`, etc.).
 - **ESM only** — Use `import`/`export`. Never use `require()`.
 - **Consistent type imports** — Use `import type { Foo } from '...'` for type-only imports.
-- **No `any`** — `@typescript-eslint/no-explicit-any` is enforced (relaxed only in `components/ui/`).
+- **No `any` by default** — `@typescript-eslint/no-explicit-any` is enforced. Path-based exception(s) are controlled by `eslint.config.js` (currently only `apps/client/src/components/ui/**/*.{ts,tsx}`).
 - **Unused variables** — Prefix with `_` (e.g., `_unused`).
 - **Validation** — Use **Zod** for all schema validation.
 - **License header** — Every `.ts`/`.tsx`/`.js` file must include:
   ```
   /**
    * @license
-   * Copyright 2026 cofy-x
+   * Copyright <year> cofy-x
    * SPDX-License-Identifier: Apache-2.0
    */
   ```
+  The year must satisfy the lint rule pattern defined in `eslint.config.js` (currently `2025` or `2026`).
 
 ### Go
 
