@@ -1,9 +1,9 @@
 [Desktop Entry]
 Version=1.0
 Type=Application
-Name=Deck Chrome Launcher Fix
-Comment=Ensure trusted metadata for desktop launcher
-Exec=/usr/local/bin/deck-fix-chrome-launcher
+Name=Deck Launcher Trust Fix
+Comment=Ensure trusted metadata for desktop launchers
+Exec=/usr/local/bin/deck-fix-desktop-launchers
 Terminal=false
 OnlyShowIn=XFCE;
 X-GNOME-Autostart-enabled=true

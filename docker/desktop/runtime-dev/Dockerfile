@@ -45,16 +45,18 @@ RUN install -d -m 0755 /etc/opt/chrome/policies/managed && \
     install -m 0644 /tmp/chrome-policy-managed.json /etc/opt/chrome/policies/managed/deck-sandbox.json && \
     rm -f /tmp/chrome-policy-managed.json
 
-COPY scripts/deck-fix-chrome-launcher.sh /usr/local/bin/deck-fix-chrome-launcher
-COPY scripts/deck-patch-xinitrc.sh /usr/local/bin/deck-patch-xinitrc
-COPY config/deck-fix-chrome-launcher.desktop /tmp/deck-fix-chrome-launcher.desktop
+ENV DECK_LAUNCHER_TRUST_FIX_PATTERNS="/usr/share/applications/google-chrome.desktop"
+
+COPY scripts/deck-fix-desktop-launchers.sh /usr/local/bin/deck-fix-desktop-launchers
+COPY scripts/deck-patch-xinitrc-launchers.sh /usr/local/bin/deck-patch-xinitrc-launchers
+COPY config/deck-fix-desktop-launchers.desktop /tmp/deck-fix-desktop-launchers.desktop
 
 RUN mkdir -p /etc/xdg/autostart && \
-    install -m 0644 /tmp/deck-fix-chrome-launcher.desktop /etc/xdg/autostart/deck-fix-chrome-launcher.desktop && \
-    rm -f /tmp/deck-fix-chrome-launcher.desktop && \
-    chmod 0755 /usr/local/bin/deck-fix-chrome-launcher /usr/local/bin/deck-patch-xinitrc && \
-    /usr/local/bin/deck-patch-xinitrc && \
-    grep -q 'deck-fix-chrome-launcher' /etc/xdg/xfce4/xinitrc
+    install -m 0644 /tmp/deck-fix-desktop-launchers.desktop /etc/xdg/autostart/deck-fix-desktop-launchers.desktop && \
+    rm -f /tmp/deck-fix-desktop-launchers.desktop && \
+    chmod 0755 /usr/local/bin/deck-fix-desktop-launchers /usr/local/bin/deck-patch-xinitrc-launchers && \
+    /usr/local/bin/deck-patch-xinitrc-launchers && \
+    grep -q 'deck-fix-desktop-launchers' /etc/xdg/xfce4/xinitrc
 
 # Install Go
 ENV GO_VERSION=1.25.6
