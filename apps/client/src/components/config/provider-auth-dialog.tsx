@@ -49,7 +49,7 @@ export function ProviderAuthDialog({
   const [oauthLoading, setOauthLoading] = useState(false);
   const [authError, setAuthError] = useState<string | null>(null);
   const setAuth = useSetAuth();
-  const { data: authMethods } = useProviderAuthMethods();
+  const { data: authMethods } = useProviderAuthMethods({ enabled: open });
   const client = useOpenCodeClient();
 
   const methods: ProviderAuthMethod[] = useMemo(

@@ -237,8 +237,12 @@ export function ChatInput({
   const [activeIndex, setActiveIndex] = useState(0);
 
   // Item counts for keyboard wrapping
-  const mentionItemCount = useMentionItemCount(mentionQuery, directory);
-  const commandItemCount = useCommandItemCount(commandQuery);
+  const mentionItemCount = useMentionItemCount(mentionQuery, directory, {
+    enabled: popoverMode === 'mention',
+  });
+  const commandItemCount = useCommandItemCount(commandQuery, {
+    enabled: popoverMode === 'command',
+  });
 
   const currentItemCount = useMemo(() => {
     if (popoverMode === 'mention') return mentionItemCount;

@@ -46,18 +46,19 @@ export function ProjectPickerDialog() {
   const [activeIndex, setActiveIndex] = useState<number>(-1);
   const [previewDirectory, setPreviewDirectory] =
     useState<ProjectDirectoryItem | null>(null);
-  const { data: paths } = usePaths();
+  const { data: paths } = usePaths({ enabled: open });
 
   // Keep the picker rooted to a stable base path.
   // Prefer user home, then fall back to the local persistent workspace path.
   const rootDirectory = paths?.home || LOCAL_SANDBOX_WORKSPACE;
 
   const { data: matchedDirectories = [], isLoading: isFindingDirectories } =
-    useFindDirectories(rootDirectory, search);
+    useFindDirectories(rootDirectory, search, { enabled: open });
   const { data: childDirectories = [], isLoading: isListingChildDirectories } =
     useListChildDirectories(
       rootDirectory,
       previewDirectory?.absolutePath ?? null,
+      { enabled: open },
     );
 
   const isChildListMode = previewDirectory !== null;

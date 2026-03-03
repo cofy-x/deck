@@ -176,7 +176,10 @@ function ModelToggleProviderGroup({
 }
 
 function ModelTogglesSection() {
-  const { models, data: providersData } = useProviders();
+  const settingsOpen = useConfigStore((s) => s.settingsOpen);
+  const { models, data: providersData } = useProviders({
+    enabled: settingsOpen,
+  });
   const [search, setSearch] = useState('');
 
   const connected = providersData?.connected ?? new Set<string>();
@@ -273,13 +276,13 @@ export function SettingsSheet() {
   const open = useConfigStore((s) => s.settingsOpen);
   const closeSettings = useConfigStore((s) => s.closeSettings);
 
-  const { data: config, isLoading: configLoading } = useConfig();
+  const { data: config, isLoading: configLoading } = useConfig({ enabled: open });
   const updateConfig = useUpdateConfig();
   const {
     providers,
     data: providersData,
     isLoading: providersLoading,
-  } = useProviders();
+  } = useProviders({ enabled: open });
 
   const connected = providersData?.connected ?? new Set<string>();
 

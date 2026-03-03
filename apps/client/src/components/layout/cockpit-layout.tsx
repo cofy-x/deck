@@ -57,8 +57,10 @@ import { useActiveConnection } from '@/hooks/use-connection';
 import { useTransientFlag } from '@/hooks/use-transient-flag';
 import {
   useDockerCheck,
+  useSandboxProjectDetectionEvents,
   useSandboxStatus,
   useSandboxState,
+  useSandboxStartupProgress,
   useStartSandbox,
   useStopSandbox,
   useCancelSandboxStart,
@@ -79,6 +81,10 @@ function toRelativeDirectory(path: string): string {
     return normalized.slice(SANDBOX_HOME_PREFIX.length);
   }
   return normalized;
+}
+
+function formatElapsedSeconds(elapsedMs: number): number {
+  return Math.max(1, Math.floor(elapsedMs / 1_000));
 }
 
 // ---------------------------------------------------------------------------
@@ -103,6 +109,8 @@ export function CockpitLayout() {
   const startSandbox = useStartSandbox();
   const stopSandbox = useStopSandbox();
   const cancelPull = useCancelSandboxStart();
+  const { phase: startupPhase, elapsedMs: startupElapsedMs } =
+    useSandboxStartupProgress();
   const profiles = useConnectionStore((s) => s.profiles);
   const setActiveProfile = useConnectionStore((s) => s.setActiveProfile);
   const switchNonce = useConnectionStore((s) => s.switchNonce);
@@ -121,6 +129,7 @@ export function CockpitLayout() {
 
   // Poll sandbox container status
   useSandboxStatus();
+  useSandboxProjectDetectionEvents();
 
   // Sync Docker check result
   useEffect(() => {
@@ -157,19 +166,55 @@ export function CockpitLayout() {
       currentDirectory)
     : null;
   const isProjectDirectoryDetecting =
+    isLocal &&
     !currentDirectory &&
     (sandboxStatus === 'pulling' ||
       sandboxStatus === 'starting' ||
-      sandboxStatus === 'running');
+      sandboxStatus === 'running' ||
+      startupPhase === 'detecting_project');
+  const startupElapsedSeconds = formatElapsedSeconds(startupElapsedMs);
+  const showSlowStartupHint = startupElapsedMs >= 45_000;
+  const showVerySlowStartupHint = startupElapsedMs >= 120_000;
+  const startupSlowHintText = showVerySlowStartupHint
+    ? t('layout.startup_very_slow_hint')
+    : showSlowStartupHint
+      ? t('layout.startup_cold_hint')
+      : null;
+  const startupPhaseHint = (() => {
+    switch (startupPhase) {
+      case 'starting_container':
+        return t('layout.startup_phase_starting_container')
+          .replace('{seconds}', String(startupElapsedSeconds));
+      case 'waiting_opencode_health':
+        return t('layout.startup_phase_waiting_health')
+          .replace('{seconds}', String(startupElapsedSeconds));
+      case 'detecting_project':
+        return t('layout.detecting_project_hint_with_elapsed')
+          .replace('{seconds}', String(startupElapsedSeconds));
+      default:
+        return isProjectDirectoryDetecting
+          ? t('layout.detecting_project_hint')
+          : t('layout.sandbox_state_changing');
+    }
+  })();
+  const startupTooltipHint = startupSlowHintText
+    ? `${startupPhaseHint} ${startupSlowHintText}`
+    : startupPhaseHint;
+  const startupCompactSuffix =
+    isProjectDirectoryDetecting && showSlowStartupHint
+      ? ` · ${t('layout.startup_slow_short_hint')}`
+      : '';
   const projectButtonLabel =
     projectDisplayName ??
     (isProjectDirectoryDetecting
-      ? t('layout.detecting_project')
+      ? t('layout.detecting_project_with_elapsed')
+        .replace('{seconds}', String(startupElapsedSeconds))
+        .concat(startupCompactSuffix)
       : t('layout.open_project'));
   const projectTooltipLabel =
     currentDirectory ??
     (isProjectDirectoryDetecting
-      ? t('layout.detecting_project_hint')
+      ? startupTooltipHint
       : t('layout.no_project'));
 
   const handleCopyPath = useCallback(async () => {
@@ -305,6 +350,7 @@ export function CockpitLayout() {
               <Separator orientation="vertical" className="mx-1 h-4 shrink-0" />
               <div className="min-w-0">
                 <ServerStatusBar
+                  enabled={sandboxStatus === 'running' && !!currentDirectory}
                   onOpenMcpDialog={() => setMcpDialogOpen(true)}
                 />
               </div>
@@ -390,7 +436,7 @@ export function CockpitLayout() {
               {sandboxActionDisabled && sandboxStatus !== 'pulling' && (
                 <div className="flex items-center gap-1.5 px-2 py-1 text-[11px] text-muted-foreground">
                   <Loader2 className="h-3 w-3 animate-spin" />
-                  {t('layout.sandbox_state_changing')}
+                  {startupTooltipHint}
                 </div>
               )}
             </DropdownMenuContent>

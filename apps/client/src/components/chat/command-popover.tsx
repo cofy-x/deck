@@ -46,7 +46,7 @@ export function CommandPopover({
   onSelect,
   onClose,
 }: CommandPopoverProps) {
-  const { data: serverCommands } = useServerCommands();
+  const { data: serverCommands } = useServerCommands({ enabled: open });
   const listRef = useRef<HTMLDivElement>(null);
 
   // Build the combined filtered items list
@@ -218,8 +218,13 @@ function CommandItemRow({
 // Hook: compute visible item count (for parent keyboard navigation)
 // ---------------------------------------------------------------------------
 
-export function useCommandItemCount(query: string): number {
-  const { data: serverCommands } = useServerCommands();
+export function useCommandItemCount(
+  query: string,
+  options?: { enabled?: boolean },
+): number {
+  const { data: serverCommands } = useServerCommands({
+    enabled: options?.enabled ?? true,
+  });
   const lowerQuery = query.toLowerCase();
 
   let count = 0;

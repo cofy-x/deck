@@ -192,12 +192,14 @@ function McpDetailPopover({ servers }: { servers: Record<string, McpStatus> }) {
 
 export function ServerStatusBar({
   onOpenMcpDialog,
+  enabled = true,
 }: {
   onOpenMcpDialog?: () => void;
+  enabled?: boolean;
 }) {
-  const { data: mcpServers } = useMcpStatus();
-  const { data: lspServers } = useLspStatus();
-  const { data: formatters } = useFormatterStatus();
+  const { data: mcpServers } = useMcpStatus({ enabled });
+  const { data: lspServers } = useLspStatus({ enabled });
+  const { data: formatters } = useFormatterStatus({ enabled });
 
   const mcpStats = useMemo(() => {
     if (!mcpServers) return { connected: 0, total: 0 };

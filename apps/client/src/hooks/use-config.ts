@@ -89,9 +89,10 @@ type ProviderListModelEntry = ProviderListItem extends {
 /**
  * Fetch the current OpenCode configuration.
  */
-export function useConfig() {
+export function useConfig(options?: { enabled?: boolean }) {
   const client = useOpenCodeClient();
   const scope = useConnectionScope();
+  const isEnabled = options?.enabled ?? true;
 
   return useQuery({
     queryKey: CONFIG_KEYS.config(scope),
@@ -100,7 +101,7 @@ export function useConfig() {
       const result = await client.config.get();
       return unwrap(result);
     },
-    enabled: !!client,
+    enabled: !!client && isEnabled,
     staleTime: 30_000,
   });
 }
@@ -137,9 +138,10 @@ export function useUpdateConfig() {
  * Fetch all providers, their connection status, and flatten models into
  * a single list for easy consumption by the model selector.
  */
-export function useProviders() {
+export function useProviders(options?: { enabled?: boolean }) {
   const client = useOpenCodeClient();
   const scope = useConnectionScope();
+  const isEnabled = options?.enabled ?? true;
 
   const query = useQuery({
     queryKey: CONFIG_KEYS.providers(scope),
@@ -183,7 +185,7 @@ export function useProviders() {
 
       return { providers, defaults, connected, models };
     },
-    enabled: !!client,
+    enabled: !!client && isEnabled,
     staleTime: 60_000,
   });
 
@@ -208,9 +210,10 @@ export function useProviders() {
  * Fetch all agents, filtering to those visible in the mode selector:
  * `mode === "primary" && hidden !== true`, sorted with `native === false` first.
  */
-export function useAgents() {
+export function useAgents(options?: { enabled?: boolean }) {
   const client = useOpenCodeClient();
   const scope = useConnectionScope();
+  const isEnabled = options?.enabled ?? true;
 
   return useQuery({
     queryKey: CONFIG_KEYS.agents(scope),
@@ -226,7 +229,7 @@ export function useAgents() {
           return a.name.localeCompare(b.name);
         });
     },
-    enabled: !!client,
+    enabled: !!client && isEnabled,
     staleTime: 120_000,
   });
 }
@@ -239,9 +242,10 @@ export function useAgents() {
  * Fetch auth methods for all providers.
  * Returns `{ [providerID]: ProviderAuthMethod[] }`.
  */
-export function useProviderAuthMethods() {
+export function useProviderAuthMethods(options?: { enabled?: boolean }) {
   const client = useOpenCodeClient();
   const scope = useConnectionScope();
+  const isEnabled = options?.enabled ?? true;
 
   return useQuery({
     queryKey: CONFIG_KEYS.providerAuth(scope),
@@ -250,7 +254,7 @@ export function useProviderAuthMethods() {
       const result = await client.provider.auth();
       return unwrap(result) ?? {};
     },
-    enabled: !!client,
+    enabled: !!client && isEnabled,
     staleTime: 120_000,
   });
 }

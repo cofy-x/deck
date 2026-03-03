@@ -6,6 +6,8 @@ mod pilot_runtime;
 mod sandbox;
 mod sse_trace;
 
+use serde::Deserialize;
+use serde::Serialize;
 use tauri::Manager;
 
 use credential_store::{
@@ -24,9 +26,178 @@ use pilot_runtime::{
 };
 use tauri::Emitter;
 
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
+use std::time::{Duration, Instant};
 
-use sandbox::{DockerInfo, PullCancelToken, SandboxConfig, SandboxStatus, SandboxStorageInfo};
+use sandbox::{
+    DockerInfo, PullCancelToken, SandboxConfig, SandboxPorts, SandboxStartResult, SandboxStatus,
+    SandboxStorageInfo,
+};
+
+#[derive(Debug, Clone, Serialize)]
+struct SandboxStartupPhaseEvent {
+    phase: String,
+}
+
+#[derive(Debug, Default)]
+struct LocalProjectDetectManager {
+    in_flight: Arc<Mutex<bool>>,
+}
+
+#[derive(Debug, Clone, Serialize)]
+struct SandboxProjectDetectingEvent {
+    trigger: String,
+}
+
+#[derive(Debug, Clone, Serialize)]
+struct SandboxProjectDetectedEvent {
+    trigger: String,
+    directory: String,
+    elapsed_ms: u64,
+}
+
+#[derive(Debug, Clone, Serialize)]
+struct SandboxProjectDetectTimeoutEvent {
+    trigger: String,
+    elapsed_ms: u64,
+    reason: String,
+}
+
+#[derive(Debug, Deserialize)]
+struct OpencodePathResponse {
+    directory: Option<String>,
+}
+
+fn start_local_project_detection(
+    app: tauri::AppHandle,
+    in_flight: Arc<Mutex<bool>>,
+    trigger: &str,
+    path_timeout_ms: u64,
+) -> Result<bool, String> {
+    {
+        let mut guard = in_flight
+            .lock()
+            .map_err(|_| "Local project detection state lock poisoned".to_string())?;
+        if *guard {
+            info!(
+                "[deck] Local project detection already in flight; skip trigger={}",
+                trigger
+            );
+            return Ok(false);
+        }
+        *guard = true;
+    }
+
+    let trigger = trigger.to_string();
+    std::thread::spawn(move || {
+        let started_at = Instant::now();
+        let url = format!(
+            "http://127.0.0.1:{}/path",
+            sandbox::SandboxPorts::default().opencode
+        );
+
+        let _ = app.emit(
+            "sandbox-project-detecting",
+            SandboxProjectDetectingEvent {
+                trigger: trigger.clone(),
+            },
+        );
+
+        let response = ureq::get(&url)
+            .timeout(Duration::from_millis(path_timeout_ms))
+            .call();
+        let elapsed_ms = started_at.elapsed().as_millis() as u64;
+
+        match response {
+            Ok(resp) => match resp.into_json::<OpencodePathResponse>() {
+                Ok(path) => {
+                    let directory = path.directory.unwrap_or_default().trim().to_string();
+                    if directory.is_empty() {
+                        let _ = app.emit(
+                            "sandbox-project-detect-timeout",
+                            SandboxProjectDetectTimeoutEvent {
+                                trigger: trigger.clone(),
+                                elapsed_ms,
+                                reason: "OpenCode /path returned empty directory".to_string(),
+                            },
+                        );
+                    } else {
+                        let _ = app.emit(
+                            "sandbox-project-detected",
+                            SandboxProjectDetectedEvent {
+                                trigger: trigger.clone(),
+                                directory,
+                                elapsed_ms,
+                            },
+                        );
+                    }
+                }
+                Err(error) => {
+                    let _ = app.emit(
+                        "sandbox-project-detect-timeout",
+                        SandboxProjectDetectTimeoutEvent {
+                            trigger: trigger.clone(),
+                            elapsed_ms,
+                            reason: format!("Failed to parse OpenCode /path response: {error}"),
+                        },
+                    );
+                }
+            },
+            Err(error) => {
+                let _ = app.emit(
+                    "sandbox-project-detect-timeout",
+                    SandboxProjectDetectTimeoutEvent {
+                        trigger: trigger.clone(),
+                        elapsed_ms,
+                        reason: format!("OpenCode /path request failed: {error}"),
+                    },
+                );
+            }
+        }
+
+        if let Ok(mut guard) = in_flight.lock() {
+            *guard = false;
+        }
+    });
+
+    Ok(true)
+}
+
+fn resolve_timeout_ms_from_env(
+    env_name: &str,
+    default_timeout_ms: u64,
+    min_timeout_ms: u64,
+    max_timeout_ms: u64,
+) -> u64 {
+    let mut timeout_ms = std::env::var(env_name)
+        .ok()
+        .and_then(|raw| raw.trim().parse::<u64>().ok())
+        .unwrap_or(default_timeout_ms);
+
+    if timeout_ms < min_timeout_ms {
+        timeout_ms = min_timeout_ms;
+    } else if timeout_ms > max_timeout_ms {
+        timeout_ms = max_timeout_ms;
+    }
+
+    timeout_ms
+}
+
+fn resolve_local_opencode_health_timeout_ms() -> u64 {
+    const DEFAULT_TIMEOUT_MS: u64 = 60_000;
+    const MIN_TIMEOUT_MS: u64 = 5_000;
+    const MAX_TIMEOUT_MS: u64 = 300_000;
+    const ENV_NAME: &str = "DECK_SANDBOX_OPENCODE_HEALTH_TIMEOUT_MS";
+    resolve_timeout_ms_from_env(ENV_NAME, DEFAULT_TIMEOUT_MS, MIN_TIMEOUT_MS, MAX_TIMEOUT_MS)
+}
+
+fn resolve_local_project_path_timeout_ms() -> u64 {
+    const DEFAULT_TIMEOUT_MS: u64 = 120_000;
+    const MIN_TIMEOUT_MS: u64 = 5_000;
+    const MAX_TIMEOUT_MS: u64 = 300_000;
+    const ENV_NAME: &str = "DECK_SANDBOX_PROJECT_PATH_TIMEOUT_MS";
+    resolve_timeout_ms_from_env(ENV_NAME, DEFAULT_TIMEOUT_MS, MIN_TIMEOUT_MS, MAX_TIMEOUT_MS)
+}
 
 fn log_startup_diagnostics() {
     info!(
@@ -160,9 +331,16 @@ fn get_sandbox_storage_info(
 async fn start_sandbox(
     app: tauri::AppHandle,
     state: tauri::State<'_, sandbox::SharedPullCancelToken>,
+    project_detect_state: tauri::State<'_, LocalProjectDetectManager>,
     config: Option<SandboxConfig>,
-) -> Result<String, String> {
+) -> Result<SandboxStartResult, String> {
     info!("[deck] Command: start_sandbox, config: {:?}", config);
+    let opencode_health_timeout_ms = resolve_local_opencode_health_timeout_ms();
+    let project_path_timeout_ms = resolve_local_project_path_timeout_ms();
+    info!(
+        "[deck] OpenCode startup timeouts: health={}ms, path={}ms",
+        opencode_health_timeout_ms, project_path_timeout_ms
+    );
     let cfg = config.unwrap_or_default();
     let image = cfg.image().to_string();
     let app_data_dir = app
@@ -171,6 +349,7 @@ async fn start_sandbox(
         .map_err(|error| format!("Failed to resolve app data dir: {error}"))?;
     let storage_root = sandbox::resolve_storage_root(&app_data_dir, &cfg);
     let token = Arc::clone(&state);
+    let project_detect_in_flight = Arc::clone(&project_detect_state.in_flight);
 
     tokio::task::spawn_blocking(move || {
         info!("[deck] Step 1: Checking image {}...", image);
@@ -188,7 +367,37 @@ async fn start_sandbox(
         }
 
         info!("[deck] Step 2: Starting container...");
-        sandbox::start_container(&cfg, &storage_root)
+        let _ = app.emit(
+            "sandbox-startup-phase",
+            SandboxStartupPhaseEvent {
+                phase: "starting_container".to_string(),
+            },
+        );
+        let start_result = sandbox::start_container(&cfg, &storage_root)?;
+
+        info!("[deck] Step 3: Waiting for OpenCode health...");
+        let _ = app.emit(
+            "sandbox-startup-phase",
+            SandboxStartupPhaseEvent {
+                phase: "waiting_opencode_health".to_string(),
+            },
+        );
+        let ports = SandboxPorts::default();
+        sandbox::wait_for_opencode_healthy(ports.opencode, opencode_health_timeout_ms)?;
+        let _ = app.emit(
+            "sandbox-startup-phase",
+            SandboxStartupPhaseEvent {
+                phase: "opencode_healthy".to_string(),
+            },
+        );
+        let _ = start_local_project_detection(
+            app.clone(),
+            Arc::clone(&project_detect_in_flight),
+            "start_sandbox",
+            project_path_timeout_ms,
+        );
+
+        Ok(start_result)
     })
     .await
     .map_err(|e| {
@@ -196,6 +405,25 @@ async fn start_sandbox(
         error!("[deck] {}", msg);
         msg
     })?
+}
+
+#[tauri::command]
+fn retry_local_project_detection(
+    app: tauri::AppHandle,
+    state: tauri::State<'_, LocalProjectDetectManager>,
+) -> Result<(), String> {
+    let status = sandbox::get_container_status(None);
+    if !status.running {
+        return Err("Sandbox is not running".to_string());
+    }
+    let project_path_timeout_ms = resolve_local_project_path_timeout_ms();
+    let _ = start_local_project_detection(
+        app,
+        Arc::clone(&state.in_flight),
+        "manual_retry",
+        project_path_timeout_ms,
+    )?;
+    Ok(())
 }
 
 #[tauri::command]
@@ -294,11 +522,13 @@ pub fn run() {
         .manage(OpencodeBridgeManager::default())
         .manage(PilotRuntimeManager::default())
         .manage(Arc::new(PullCancelToken::default()) as sandbox::SharedPullCancelToken)
+        .manage(LocalProjectDetectManager::default())
         .invoke_handler(tauri::generate_handler![
             check_docker,
             get_sandbox_status,
             get_sandbox_storage_info,
             start_sandbox,
+            retry_local_project_detection,
             stop_sandbox,
             reset_sandbox_storage,
             cancel_sandbox_start,

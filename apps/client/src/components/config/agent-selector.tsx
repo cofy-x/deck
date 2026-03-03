@@ -31,7 +31,7 @@ import { t } from '@/i18n';
 
 export function AgentSelector({ className }: { className?: string }) {
   const [open, setOpen] = useState(false);
-  const { data: agents } = useAgents();
+  const { data: agents } = useAgents({ enabled: open });
   const selectedAgent = useChatStore((s) => s.selectedAgent);
   const setSelectedAgent = useChatStore((s) => s.setSelectedAgent);
 

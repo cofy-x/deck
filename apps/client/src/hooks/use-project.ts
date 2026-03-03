@@ -125,9 +125,10 @@ function dedupeDirectories(
 /**
  * Fetch system paths from the OpenCode server (home, state, config, etc.).
  */
-export function usePaths() {
+export function usePaths(options?: { enabled?: boolean }) {
   const client = useOpenCodeClient();
   const scope = useConnectionScope();
+  const isEnabled = options?.enabled ?? true;
 
   return useQuery({
     queryKey: PROJECT_KEYS.paths(scope),
@@ -136,7 +137,7 @@ export function usePaths() {
       const result = await client.path.get();
       return unwrap(result);
     },
-    enabled: !!client,
+    enabled: !!client && isEnabled,
     staleTime: 300_000, // paths rarely change
   });
 }
@@ -145,17 +146,42 @@ export function usePaths() {
  * Search for directories under a given base path.
  * Used by the project picker to list available projects under /home/deck.
  */
-export function useFindDirectories(baseDirectory: string, searchQuery: string) {
+export function useFindDirectories(
+  baseDirectory: string,
+  searchQuery: string,
+  options?: { enabled?: boolean },
+) {
   const client = useOpenCodeClient();
   const scope = useConnectionScope();
+  const isEnabled = options?.enabled ?? true;
 
   return useQuery({
     queryKey: PROJECT_KEYS.findDirs(scope, baseDirectory, searchQuery),
     queryFn: async (): Promise<ProjectDirectoryItem[]> => {
       if (!client) return [];
+      if (!baseDirectory.trim()) return [];
+      const trimmedQuery = searchQuery.trim();
+
+      // Empty query should list only immediate child directories.
+      // Full recursive find on startup is expensive and blocks first-load UX.
+      if (!trimmedQuery) {
+        const listResult = await client.file.list({
+          directory: baseDirectory,
+          path: '',
+        });
+        const listData = unwrap(listResult);
+        if (!Array.isArray(listData)) return [];
+
+        return dedupeDirectories(
+          listData
+            .map((node) => createDirectoryFromNode(baseDirectory, node))
+            .filter((item): item is ProjectDirectoryItem => item !== null),
+        );
+      }
+
       const result = await client.find.files({
         directory: baseDirectory,
-        query: searchQuery,
+        query: trimmedQuery,
         type: 'directory',
         limit: 50,
       });
@@ -171,7 +197,7 @@ export function useFindDirectories(baseDirectory: string, searchQuery: string) {
           .filter((item): item is ProjectDirectoryItem => item !== null),
       );
     },
-    enabled: !!client,
+    enabled: !!client && isEnabled,
     staleTime: 10_000,
   });
 }
@@ -183,9 +209,11 @@ export function useFindDirectories(baseDirectory: string, searchQuery: string) {
 export function useListChildDirectories(
   rootDirectory: string,
   directory: string | null,
+  options?: { enabled?: boolean },
 ) {
   const client = useOpenCodeClient();
   const scope = useConnectionScope();
+  const isEnabled = options?.enabled ?? true;
 
   return useQuery({
     queryKey:
@@ -208,7 +236,7 @@ export function useListChildDirectories(
           .filter((item): item is ProjectDirectoryItem => item !== null),
       );
     },
-    enabled: !!client && !!directory,
+    enabled: !!client && !!directory && isEnabled,
     staleTime: 10_000,
   });
 }

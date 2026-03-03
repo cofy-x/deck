@@ -49,8 +49,8 @@ export function MentionPopover({
   onSelect,
   onClose,
 }: MentionPopoverProps) {
-  const { data: subagents } = useSubagents();
-  const { data: files } = useFindFiles(query, directory);
+  const { data: subagents } = useSubagents({ enabled: open });
+  const { data: files } = useFindFiles(query, directory, { enabled: open });
   const listRef = useRef<HTMLDivElement>(null);
 
   // Build the combined items list
@@ -224,9 +224,11 @@ function MentionItemRow({
 export function useMentionItemCount(
   query: string,
   directory?: string | null,
+  options?: { enabled?: boolean },
 ): number {
-  const { data: subagents } = useSubagents();
-  const { data: files } = useFindFiles(query, directory);
+  const enabled = options?.enabled ?? true;
+  const { data: subagents } = useSubagents({ enabled });
+  const { data: files } = useFindFiles(query, directory, { enabled });
 
   let count = 0;
   if (subagents) {

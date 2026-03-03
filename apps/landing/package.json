@@ -13,7 +13,8 @@
     "build": "tsc && vite build",
     "preview": "vite preview",
     "lint": "eslint . --ext .ts,.tsx",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "assets:demo": "bash ./scripts/generate-demo-assets.sh"
   },
   "files": [
     "dist"

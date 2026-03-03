@@ -15,12 +15,12 @@
 
 <p align="center">
   <a href="https://github.com/cofy-x/deck" style="display: inline-block; border: 1px solid #e1e4e8; border-radius: 12px; overflow: hidden; box-shadow: 0 10px 30px rgba(0,0,0,0.1); line-height: 0;">
-    <img src="./docs/media/client/demo.gif" alt="Deck Client Demo" width="800" style="display: block; border-radius: 0;">
+    <img src="./apps/landing/public/demo.gif" alt="Deck Client Demo" width="800" style="display: block; border-radius: 0;">
   </a>
 </p>
 
 > [!NOTE]
-> Deck 当前处于 **稳定桌面版本** 阶段（`v0.0.1`）。
+> Deck 当前处于 **稳定桌面版本** 阶段。
 > 当前桌面安装包为 macOS DMG（已签名并公证）。
 > Windows 和 Linux 桌面版本已在路线图中。
 
@@ -157,7 +157,7 @@ graph LR
 ```
 deck/
 ├── apps/
-│   ├── client/          # Tauri v2 桌面驾驶舱（v0.0.1 主要产品界面）
+│   ├── client/          # Tauri v2 桌面驾驶舱（当前主要产品界面）
 │   ├── pilot/           # 可选自动化套件（多渠道与编排）
 │   │   ├── bridge/      #   消息桥接适配器
 │   │   ├── host/        #   无头 CLI 编排器

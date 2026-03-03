@@ -38,7 +38,17 @@ export const zh: Record<string, string> = {
   'layout.open_project': '打开项目',
   'layout.no_project': '未选择项目',
   'layout.detecting_project': '正在识别项目...',
+  'layout.detecting_project_with_elapsed': '正在识别项目... {seconds}s',
   'layout.detecting_project_hint': '沙盒已运行，正在识别工作目录...',
+  'layout.detecting_project_hint_with_elapsed':
+    '正在识别沙盒工作目录（已耗时 {seconds}s）...',
+  'layout.startup_phase_starting_container':
+    '正在启动沙盒容器（已耗时 {seconds}s）...',
+  'layout.startup_phase_waiting_health':
+    'OpenCode 正在启动，等待健康检查（已耗时 {seconds}s）...',
+  'layout.startup_cold_hint': '首次冷启动可能需要 1-2 分钟。',
+  'layout.startup_very_slow_hint': '仍在初始化中，本次启动耗时高于常见情况。',
+  'layout.startup_slow_short_hint': '冷启动中',
   'layout.project_path_copied': '项目路径已复制',
   'layout.project_path_copy_failed': '复制项目路径失败',
   'layout.open_external': '编辑器',
@@ -69,6 +79,8 @@ export const zh: Record<string, string> = {
   'chat.welcome_connection': '当前连接：{name}',
   'chat.welcome_auth_error_hint': '请先在设置中更新 OpenCode 凭证，再重试连接。',
   'chat.new_session': '新建',
+  'chat.project_detecting': '正在准备工作区... {seconds}s',
+  'chat.project_detecting_wait_health': 'AI 助手服务启动中... {seconds}s',
   'chat.archive_session': '归档会话',
   'chat.untitled_session': '未命名会话',
   'chat.placeholder_disabled': '请先启动沙盒以开始对话...',
@@ -337,6 +349,12 @@ export const zh: Record<string, string> = {
   'sandbox.pull_log_waiting': '等待拉取输出...',
   'sandbox.starting_ai': '正在启动 AI 助手...',
   'sandbox.starting_ai_desc': '正在初始化桌面环境和 AI 服务。',
+  'sandbox.starting_phase_starting_container':
+    '正在启动沙盒容器（已耗时 {seconds}s）...',
+  'sandbox.starting_phase_waiting_health':
+    '正在等待 OpenCode 健康检查（已耗时 {seconds}s）...',
+  'sandbox.starting_ai_cold_hint':
+    '首次冷启动时 OpenCode 初始化可能需要 1-2 分钟。',
   'sandbox.remote_title': '远程 AI 沙盒',
   'sandbox.local_title': 'AI 桌面沙盒',
   'sandbox.remote_description': '连接到远程 OpenCode + 桌面沙盒服务。',

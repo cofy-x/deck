@@ -102,8 +102,12 @@ fn write_managed_host_file(path: &Path) -> Result<(), String> {
     let content = build_managed_host_content();
     let existing = fs::read_to_string(path).unwrap_or_default();
     if existing != content {
-        fs::write(path, content)
-            .map_err(|error| format!("Failed to write SSH host file '{}': {error}", path.display()))?;
+        fs::write(path, content).map_err(|error| {
+            format!(
+                "Failed to write SSH host file '{}': {error}",
+                path.display()
+            )
+        })?;
     }
     set_unix_permissions(path, 0o600)?;
     Ok(())
@@ -203,7 +207,11 @@ fn reset_local_known_host() {
         .status();
 }
 
-fn launch_editor(editor: &ExternalEditor, host_alias: &str, directory: &str) -> Result<String, String> {
+fn launch_editor(
+    editor: &ExternalEditor,
+    host_alias: &str,
+    directory: &str,
+) -> Result<String, String> {
     let remote = format!("ssh-remote+{host_alias}");
     let candidates = match editor {
         ExternalEditor::Vscode => VSCODE_CANDIDATES,
