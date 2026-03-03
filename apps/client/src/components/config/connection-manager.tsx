@@ -4,7 +4,14 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 import { useEffect, useMemo, useState } from 'react';
-import { Plus, Pencil, Trash2, Check, AlertTriangle } from 'lucide-react';
+import {
+  Plus,
+  Pencil,
+  Trash2,
+  Check,
+  AlertTriangle,
+  ChevronRight,
+} from 'lucide-react';
 import { toast } from 'sonner';
 
 import { t } from '@/i18n';
@@ -12,6 +19,11 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { cn } from '@/lib/utils';
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from '@/components/ui/collapsible';
 import {
   useConnectionStore,
   type ConnectionProfile,
@@ -29,6 +41,8 @@ import {
   useResetSandboxStorage,
   useSandboxStorageInfo,
 } from '@/hooks/use-sandbox';
+import { useSandboxStore } from '@/stores/sandbox-store';
+import { isAuthConnectionErrorMessage } from '@/lib/connection-errors';
 
 const SAVE_FEEDBACK_DURATION_MS = 1500;
 
@@ -74,8 +88,12 @@ export function ConnectionManager() {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [daemonToken, setDaemonToken] = useState('');
+  const [credentialsExpanded, setCredentialsExpanded] = useState(
+    activeProfile.type === 'remote',
+  );
   const [reconnectAfterSave, setReconnectAfterSave] = useState(false);
   const sandboxStatus = useSandboxState();
+  const sandboxErrorMessage = useSandboxStore((s) => s.errorMessage);
   const startSandbox = useStartSandbox();
   const resetSandboxStorage = useResetSandboxStorage();
   const {
@@ -88,12 +106,35 @@ export function ConnectionManager() {
     trigger: triggerSaveFeedback,
     clear: clearSaveFeedback,
   } = useTransientFlag(SAVE_FEEDBACK_DURATION_MS);
+  const hasSavedCredentials = useMemo(
+    () =>
+      Boolean(
+        secrets.opencodeUsername?.trim() ||
+          secrets.opencodePassword ||
+          secrets.daemonToken?.trim(),
+      ),
+    [secrets],
+  );
+  const hasRemoteAuthError =
+    activeProfile.type === 'remote' &&
+    sandboxStatus === 'error' &&
+    isAuthConnectionErrorMessage(sandboxErrorMessage);
 
   useEffect(() => {
     setUsername(secrets.opencodeUsername ?? '');
     setPassword(secrets.opencodePassword ?? '');
     setDaemonToken(secrets.daemonToken ?? '');
   }, [activeProfile.id, secrets]);
+
+  useEffect(() => {
+    setCredentialsExpanded(activeProfile.type === 'remote');
+  }, [activeProfile.id, activeProfile.type]);
+
+  useEffect(() => {
+    if (hasRemoteAuthError) {
+      setCredentialsExpanded(true);
+    }
+  }, [hasRemoteAuthError]);
 
   useEffect(() => {
     clearSaveFeedback();
@@ -248,106 +289,147 @@ export function ConnectionManager() {
         })}
       </div>
 
-      <div className="flex flex-col gap-3 rounded-md border p-3">
-        <div>
-          <h4 className="text-xs font-medium">{t('connection.credentials_title')}</h4>
-          <p className="text-[11px] text-muted-foreground">
-            {t('connection.credentials_description')}
-          </p>
-        </div>
-
-        <div className="grid gap-1.5">
-          <Label htmlFor="conn-username">{t('connection.opencode_username')}</Label>
-          <Input
-            id="conn-username"
-            value={username}
-            onChange={(event) => {
-              setUsername(event.target.value);
-              clearSaveFeedback();
-            }}
-            placeholder={t('connection.placeholder_username')}
-            autoComplete="off"
-            spellCheck={false}
-            autoCapitalize="none"
-            autoCorrect="off"
-            className={cn(
-              'placeholder:text-current',
-              username ? 'text-foreground' : 'text-muted-foreground',
-            )}
-          />
-        </div>
-
-        <div className="grid gap-1.5">
-          <Label htmlFor="conn-password">{t('connection.opencode_password')}</Label>
-          <Input
-            id="conn-password"
-            type="password"
-            value={password}
-            onChange={(event) => {
-              setPassword(event.target.value);
-              clearSaveFeedback();
-            }}
-            placeholder={t('connection.placeholder_password')}
-            autoComplete="new-password"
-            spellCheck={false}
-            autoCapitalize="none"
-            autoCorrect="off"
-            className={cn(
-              'placeholder:text-current',
-              password ? 'text-foreground' : 'text-muted-foreground',
-            )}
-          />
-        </div>
-
-        <div className="grid gap-1.5">
-          <Label htmlFor="conn-daemon-token">{t('connection.daemon_token')}</Label>
-          <Input
-            id="conn-daemon-token"
-            type="password"
-            value={daemonToken}
-            onChange={(event) => {
-              setDaemonToken(event.target.value);
-              clearSaveFeedback();
-            }}
-            placeholder={t('connection.placeholder_optional')}
-            autoComplete="off"
-            spellCheck={false}
-            autoCapitalize="none"
-            autoCorrect="off"
-            className={cn(
-              'placeholder:text-current',
-              daemonToken ? 'text-foreground' : 'text-muted-foreground',
-            )}
-          />
-        </div>
-
-        <div className="flex items-center gap-2">
-          <Button
-            size="sm"
-            className="relative min-w-[76px]"
-            onClick={handleSaveSecrets}
-            aria-live="polite"
-          >
-            <span
-              className={cn(
-                'transition-all duration-200',
-                saveFeedbackVisible ? 'scale-95 opacity-0' : 'scale-100 opacity-100',
-              )}
+      <Collapsible open={credentialsExpanded} onOpenChange={setCredentialsExpanded}>
+        <div className="rounded-md border">
+          <CollapsibleTrigger asChild>
+            <button
+              type="button"
+              className="flex w-full items-start justify-between gap-3 rounded-md p-3 text-left hover:bg-muted/30"
             >
-              {t('common.save')}
-            </span>
-            <Check
-              className={cn(
-                'pointer-events-none absolute inset-0 m-auto h-4 w-4 transition-all duration-200',
-                saveFeedbackVisible ? 'scale-100 opacity-100' : 'scale-75 opacity-0',
-              )}
-            />
-          </Button>
-          <Button size="sm" variant="outline" onClick={handleClearSecrets}>
-            {t('common.clear')}
-          </Button>
+              <div className="flex min-w-0 items-start gap-2">
+                <ChevronRight
+                  className={cn(
+                    'mt-0.5 h-3.5 w-3.5 shrink-0 transition-transform',
+                    credentialsExpanded && 'rotate-90',
+                  )}
+                />
+                <div className="min-w-0">
+                  <h4 className="text-xs font-medium">
+                    {t('connection.credentials_title')}
+                  </h4>
+                  <p className="text-[11px] text-muted-foreground">
+                    {activeProfile.type === 'remote'
+                      ? t('connection.credentials_description')
+                      : t('connection.credentials_local_hint')}
+                  </p>
+                </div>
+              </div>
+              <span
+                className={cn(
+                  'shrink-0 rounded-full border px-2 py-0.5 text-[10px] font-medium',
+                  hasSavedCredentials
+                    ? 'border-emerald-500/40 text-emerald-600 dark:text-emerald-300'
+                    : 'border-muted-foreground/30 text-muted-foreground',
+                )}
+              >
+                {hasSavedCredentials
+                  ? t('connection.credentials_status_configured')
+                  : t('connection.credentials_status_not_configured')}
+              </span>
+            </button>
+          </CollapsibleTrigger>
+
+          <CollapsibleContent className="border-t">
+            <div className="flex flex-col gap-3 p-3">
+              <div className="grid gap-1.5">
+                <Label htmlFor="conn-username">{t('connection.opencode_username')}</Label>
+                <Input
+                  id="conn-username"
+                  value={username}
+                  onChange={(event) => {
+                    setUsername(event.target.value);
+                    clearSaveFeedback();
+                  }}
+                  placeholder={t('connection.placeholder_username')}
+                  autoComplete="off"
+                  spellCheck={false}
+                  autoCapitalize="none"
+                  autoCorrect="off"
+                  className={cn(
+                    'placeholder:text-current',
+                    username ? 'text-foreground' : 'text-muted-foreground',
+                  )}
+                />
+              </div>
+
+              <div className="grid gap-1.5">
+                <Label htmlFor="conn-password">{t('connection.opencode_password')}</Label>
+                <Input
+                  id="conn-password"
+                  type="password"
+                  value={password}
+                  onChange={(event) => {
+                    setPassword(event.target.value);
+                    clearSaveFeedback();
+                  }}
+                  placeholder={t('connection.placeholder_password')}
+                  autoComplete="new-password"
+                  spellCheck={false}
+                  autoCapitalize="none"
+                  autoCorrect="off"
+                  className={cn(
+                    'placeholder:text-current',
+                    password ? 'text-foreground' : 'text-muted-foreground',
+                  )}
+                />
+              </div>
+
+              <div className="grid gap-1.5">
+                <Label htmlFor="conn-daemon-token">{t('connection.daemon_token')}</Label>
+                <Input
+                  id="conn-daemon-token"
+                  type="password"
+                  value={daemonToken}
+                  onChange={(event) => {
+                    setDaemonToken(event.target.value);
+                    clearSaveFeedback();
+                  }}
+                  placeholder={t('connection.placeholder_optional')}
+                  autoComplete="off"
+                  spellCheck={false}
+                  autoCapitalize="none"
+                  autoCorrect="off"
+                  className={cn(
+                    'placeholder:text-current',
+                    daemonToken ? 'text-foreground' : 'text-muted-foreground',
+                  )}
+                />
+              </div>
+
+              <div className="flex items-center gap-2">
+                <Button
+                  size="sm"
+                  className="relative min-w-[76px]"
+                  onClick={handleSaveSecrets}
+                  aria-live="polite"
+                >
+                  <span
+                    className={cn(
+                      'transition-all duration-200',
+                      saveFeedbackVisible
+                        ? 'scale-95 opacity-0'
+                        : 'scale-100 opacity-100',
+                    )}
+                  >
+                    {t('common.save')}
+                  </span>
+                  <Check
+                    className={cn(
+                      'pointer-events-none absolute inset-0 m-auto h-4 w-4 transition-all duration-200',
+                      saveFeedbackVisible
+                        ? 'scale-100 opacity-100'
+                        : 'scale-75 opacity-0',
+                    )}
+                  />
+                </Button>
+                <Button size="sm" variant="outline" onClick={handleClearSecrets}>
+                  {t('common.clear')}
+                </Button>
+              </div>
+            </div>
+          </CollapsibleContent>
         </div>
-      </div>
+      </Collapsible>
 
       {activeProfile.type === 'local' ? (
         <div className="flex flex-col gap-3 rounded-md border p-3">

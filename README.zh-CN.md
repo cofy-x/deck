@@ -8,7 +8,7 @@
 
 <p align="center">
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-Apache%202.0-blue.svg" alt="License"></a>
-  <a href="https://github.com/cofy-x/deck/releases"><img src="https://img.shields.io/github/v/release/cofy-x/deck?include_prereleases&label=release" alt="Release"></a>
+  <a href="https://github.com/cofy-x/deck/releases"><img src="https://img.shields.io/github/v/release/cofy-x/deck?label=release" alt="Release"></a>
   <a href="https://github.com/cofy-x/deck/stargazers"><img src="https://img.shields.io/github/stars/cofy-x/deck?style=social" alt="Stars"></a>
   <a href="https://github.com/cofy-x/deck/actions/workflows/docker-desktop-images.yml"><img src="https://github.com/cofy-x/deck/actions/workflows/docker-desktop-images.yml/badge.svg" alt="Docker Images"></a>
 </p>
@@ -20,7 +20,7 @@
 </p>
 
 > [!NOTE]
-> Deck 目前处于 **预发布** 阶段（`v0.0.1`）。
+> Deck 当前处于 **稳定桌面版本** 阶段（`v0.0.1`）。
 > 当前桌面安装包为 macOS DMG（已签名并公证）。
 > Windows 和 Linux 桌面版本已在路线图中。
 
@@ -28,13 +28,17 @@
 
 ## 为什么选择 Deck？
 
+🔁 **闭环 AI 工作流** — 启动沙盒 -> 观察桌面执行 -> 从顶部栏一键接力到编辑器、OpenCode 或终端，始终保持上下文连续。
+
 🔒 **本地优先沙箱** — 一键启动隔离的 Docker 容器，内置完整 Linux 桌面、开发工具和 AI 代理。数据始终留在你的机器上。
 
-🖥️ **一个驾驶舱，两种模式** — 左侧与 AI 对话，右侧通过 noVNC 实时观察 AI 在桌面上的操作。本地与远程沙箱无缝切换，工作流程不变。
+🖥️ **实时桌面可观测性** — 通过 noVNC 实时查看执行过程，结合命令级追踪与权限控制，让自动化过程可见、可控。
+
+🚦 **本地/远程配置编排** — 可管理多个连接目标并即时切换，在同一驾驶舱内保持一致操作体验。
 
 🤖 **AI 原生架构** — 内置 OpenCode 集成，支持多轮 AI 会话、工具调用、文件差异对比、推理追踪和权限控制。
 
-💬 **消息桥接 (Pilot)** — 通过统一的桥接套件，从微信、Telegram、Slack、飞书、Discord、钉钉、邮件等渠道编排 AI 代理。
+💬 **Pilot 自动化套件（可选）** — 在需要时将驾驶舱工作流扩展到多渠道消息触达与无头编排能力。
 
 🧩 **多语言 Monorepo** — TypeScript、Go、Rust、Python 共存一个仓库，使用 pnpm、Go 工作区、Cargo 和 uv 管理 — 扩展平台所需的一切。
 
@@ -46,13 +50,13 @@
 
 ### 1. 安装应用
 
-从 **[GitHub Releases](https://github.com/cofy-x/deck/releases)** 下载最新的预发布 macOS DMG，打开后将 `deck.app` 拖入 `/Applications`。
+从 **[GitHub Releases](https://github.com/cofy-x/deck/releases)** 下载最新的 macOS DMG，打开后将 `deck.app` 拖入 `/Applications`。
 
 当前桌面安装包以 macOS 为主，Windows 与 Linux 版本已在路线图中。
 
-### 2. 启动沙箱
+### 2. 启动本地沙箱并打开项目目录
 
-打开应用，选择内置的 **Local** 配置文件，点击 **Start Sandbox**。
+打开应用，选择内置的 **Local** 配置，点击 **Start Sandbox**，然后通过 **Open Project** 选择工作目录。
 
 首次运行时应用会自动拉取 `ghcr.io/cofy-x/deck/desktop-sandbox-ai:latest` 镜像，并显示实时进度。
 
@@ -62,7 +66,17 @@
 > docker pull ghcr.io/cofy-x/deck/desktop-sandbox-ai:latest
 > ```
 
-### 3. 本地沙盒数据持久化
+### 3. 从顶部栏接力到开发工具
+
+沙盒运行后，可从顶部栏进入你偏好的工作界面：
+
+- `编辑器（VS Code/Cursor）`：仅在 **本地沙箱** 可用。
+- `终端`：仅在 **本地沙箱** 可用。
+- `OpenCode`：在任何 **运行中的连接** 可用（本地/远程）。
+
+> `Pilot 自动化套件`为可选能力，当前以 `apps/pilot/{host,server,bridge}` 独立模块运行；驾驶舱内流程一体化仍在路线图推进中。
+
+## 💾 本地沙盒数据持久化（默认启用）
 
 `apps/client` 的本地沙盒默认启用磁盘持久化，并在 Stop/Start 之间复用同一个容器：
 
@@ -118,8 +132,8 @@ graph LR
   Daemon --> Desktop["Linux 桌面<br/>(noVNC)"]
   Daemon --> ComputerUse["Computer Use<br/>(鼠标 / 键盘)"]
 
-  User --> PilotBridge["Pilot Bridge<br/>(微信, Telegram, …)"]
-  PilotBridge --> PilotHost["Pilot Host"]
+  User --> PilotSuite["Pilot 套件（可选）<br/>(Host / Server / Bridge)"]
+  PilotSuite --> PilotHost["Pilot Host"]
   PilotHost --> Daemon
 ```
 
@@ -133,7 +147,7 @@ graph LR
 | 沙箱运行时 | Go, Docker, noVNC, X11, supervisord                             |
 | AI 集成    | OpenCode, SSE 流式传输, MCP 工具服务器                          |
 | 后端服务   | NestJS, Fastify, Drizzle ORM, PostgreSQL, Redis, BullMQ         |
-| 消息桥接   | Node.js, 微信 / Telegram / Slack / 飞书 / Discord / 钉钉 / 邮件 |
+| 消息桥接   | Node.js，多渠道适配器框架（通过 Pilot 套件按需启用） |
 | 构建工具   | pnpm, Cargo, Go 工作区, uv, Makefile                            |
 
 ---
@@ -144,8 +158,8 @@ graph LR
 deck/
 ├── apps/
 │   ├── client/          # Tauri v2 桌面驾驶舱（v0.0.1 主要产品界面）
-│   ├── pilot/           # 消息桥接 + 编排套件
-│   │   ├── bridge/      #   微信, Telegram, Slack, 飞书, Discord, …
+│   ├── pilot/           # 可选自动化套件（多渠道与编排）
+│   │   ├── bridge/      #   消息桥接适配器
 │   │   ├── host/        #   无头 CLI 编排器
 │   │   └── server/      #   沙箱文件系统 API 服务器
 │   ├── api/             # NestJS BFF 服务
@@ -178,7 +192,7 @@ deck/
 
 ### v0.1 — 下一步
 
-- 在客户端中直接集成 Pilot 桥接功能。
+- 增强驾驶舱到 Pilot 的流程连续性。
 - 统一桌面和桥接编排，提供单一操作入口。
 - 多会话和多沙箱管理。
 - 增强文件查看器、差异查看器和 Markdown 预览。

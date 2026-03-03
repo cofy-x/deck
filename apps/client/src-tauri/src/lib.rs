@@ -1,5 +1,6 @@
 mod api_log;
 mod credential_store;
+mod external_editor;
 mod opencode_bridge;
 mod pilot_runtime;
 mod sandbox;
@@ -11,6 +12,7 @@ use credential_store::{
     init_credential_store, list_credentials, list_custom_providers, remove_credential,
     remove_custom_provider, save_credential, save_custom_provider,
 };
+use external_editor::{OpenProjectInEditorInput, OpenProjectInEditorResult};
 use log::{debug, error, info, warn};
 use opencode_bridge::{
     start_bridge, stop_bridge, OpencodeBridgeManager, StartOpencodeWebBridgeInput,
@@ -250,6 +252,14 @@ fn get_app_log_dir(app: tauri::AppHandle) -> Result<String, String> {
         .map_err(|e| format!("Failed to resolve app log dir: {}", e))
 }
 
+#[tauri::command]
+fn open_project_in_editor(
+    app: tauri::AppHandle,
+    input: OpenProjectInEditorInput,
+) -> Result<OpenProjectInEditorResult, String> {
+    external_editor::open_project_in_editor(&app, input)
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     let log_plugin = tauri_plugin_log::Builder::new()
@@ -293,6 +303,7 @@ pub fn run() {
             reset_sandbox_storage,
             cancel_sandbox_start,
             get_app_log_dir,
+            open_project_in_editor,
             log_api_call,
             log_sse_trace_entry,
             get_sse_trace_log_path,

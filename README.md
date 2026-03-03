@@ -8,7 +8,7 @@
 
 <p align="center">
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-Apache%202.0-blue.svg" alt="License"></a>
-  <a href="https://github.com/cofy-x/deck/releases"><img src="https://img.shields.io/github/v/release/cofy-x/deck?include_prereleases&label=release" alt="Release"></a>
+  <a href="https://github.com/cofy-x/deck/releases"><img src="https://img.shields.io/github/v/release/cofy-x/deck?label=release" alt="Release"></a>
   <a href="https://github.com/cofy-x/deck/stargazers"><img src="https://img.shields.io/github/stars/cofy-x/deck?style=social" alt="Stars"></a>
   <a href="https://github.com/cofy-x/deck/actions/workflows/docker-desktop-images.yml"><img src="https://github.com/cofy-x/deck/actions/workflows/docker-desktop-images.yml/badge.svg" alt="Docker Images"></a>
 </p>
@@ -20,7 +20,7 @@
 </p>
 
 > [!NOTE]
-> Deck is currently in **prerelease** (`v0.0.1`).
+> Deck is currently in the **stable desktop release** line (`v0.0.1`).
 > Official desktop downloads are currently macOS DMG (signed and notarized).
 > Windows and Linux desktop builds are planned on the roadmap.
 
@@ -28,13 +28,17 @@
 
 ## Why Deck?
 
+🔁 **Closed-Loop AI Workflow** — Start Sandbox -> Observe Desktop -> Handoff to Editor, OpenCode, or Terminal from the top bar without breaking context.
+
 🔒 **Local-First Sandboxes** — Spin up isolated Docker containers with a full Linux desktop, dev tools, and AI agents. Your data stays on your machine.
 
-🖥️ **One Cockpit, Two Modes** — Chat with AI on the left, watch it work on a live desktop (noVNC) on the right. Switch between local and remote sandboxes without changing your workflow.
+🖥️ **Live Desktop Visibility** — Chat with AI and inspect real execution in noVNC with command-level traceability and permission-aware actions.
+
+🚦 **Local/Remote Profile Orchestration** — Keep multiple connection targets and switch instantly while preserving one cockpit workflow.
 
 🤖 **AI-Native Architecture** — Built-in OpenCode integration for multi-turn AI sessions with tool execution, file diffs, reasoning traces, and permission controls.
 
-💬 **Messaging Bridge (Pilot)** — Orchestrate AI agents from WhatsApp, Telegram, Slack, Feishu, Discord, DingTalk, Email, and more through a unified bridge suite.
+💬 **Pilot Automation Suite (Optional)** — Extend cockpit workflows to multi-channel messaging and headless orchestration when needed.
 
 🧩 **Polyglot Monorepo** — TypeScript, Go, Rust, and Python in one repo with pnpm, Go workspaces, Cargo, and uv — everything you need to extend the platform.
 
@@ -46,13 +50,13 @@
 
 ### 1. Install the app
 
-Download the latest prerelease macOS DMG from **[GitHub Releases](https://github.com/cofy-x/deck/releases)**, open it, and drag `deck.app` into `/Applications`.
+Download the latest macOS DMG from **[GitHub Releases](https://github.com/cofy-x/deck/releases)**, open it, and drag `deck.app` into `/Applications`.
 
 Current desktop release assets are for macOS. Windows and Linux builds are on the roadmap.
 
-### 2. Start a sandbox
+### 2. Start a local sandbox and open your project directory
 
-Open the app, select the built-in **Local** profile, and click **Start Sandbox**.
+Open the app, select the built-in **Local** profile, click **Start Sandbox**, then choose your working directory from **Open Project**.
 
 The app will automatically pull `ghcr.io/cofy-x/deck/desktop-sandbox-ai:latest` on first run with a live progress indicator.
 
@@ -61,6 +65,16 @@ The app will automatically pull `ghcr.io/cofy-x/deck/desktop-sandbox-ai:latest` 
 > ```bash
 > docker pull ghcr.io/cofy-x/deck/desktop-sandbox-ai:latest
 > ```
+
+### 3. Handoff from the top bar
+
+After the sandbox is running, use the top bar to continue in your preferred surface:
+
+- `Editor (VS Code/Cursor)`: available for **Local Sandbox**.
+- `Terminal`: available for **Local Sandbox**.
+- `OpenCode`: available for any **running connection** (Local or Remote).
+
+> `Pilot Automation Suite` is optional and currently operated as separate `apps/pilot/{host,server,bridge}` modules; cockpit-native continuity is roadmap work.
 
 ---
 
@@ -103,8 +117,8 @@ graph LR
   Daemon --> Desktop["Linux Desktop<br/>(noVNC)"]
   Daemon --> ComputerUse["Computer Use<br/>(mouse / keyboard)"]
 
-  User --> PilotBridge["Pilot Bridge<br/>(WhatsApp, Telegram, …)"]
-  PilotBridge --> PilotHost["Pilot Host"]
+  User --> PilotSuite["Pilot Suite (Optional)<br/>(Host / Server / Bridge)"]
+  PilotSuite --> PilotHost["Pilot Host"]
   PilotHost --> Daemon
 ```
 
@@ -118,7 +132,7 @@ graph LR
 | Sandbox Runtime  | Go, Docker, noVNC, X11, supervisord                                        |
 | AI Integration   | OpenCode, SSE streaming, MCP tool server                                   |
 | Backend Services | NestJS, Fastify, Drizzle ORM, PostgreSQL, Redis, BullMQ                    |
-| Messaging Bridge | Node.js, WhatsApp / Telegram / Slack / Feishu / Discord / DingTalk / Email |
+| Messaging Bridge | Node.js, multi-channel adapter framework (optional via Pilot suite) |
 | Build & Tooling  | pnpm, Cargo, Go workspaces, uv, Makefile                                   |
 
 ---
@@ -129,8 +143,8 @@ graph LR
 deck/
 ├── apps/
 │   ├── client/          # Tauri v2 desktop cockpit (primary v0.0.1 surface)
-│   ├── pilot/           # Messaging bridge + orchestration suite
-│   │   ├── bridge/      #   WhatsApp, Telegram, Slack, Feishu, Discord, …
+│   ├── pilot/           # Optional automation suite for orchestration workflows
+│   │   ├── bridge/      #   Messaging bridge adapters
 │   │   ├── host/        #   Headless CLI orchestrator
 │   │   └── server/      #   Filesystem API server for sandboxes
 │   ├── api/             # NestJS BFF service
@@ -163,7 +177,7 @@ See [module-status.md](.x/module-status.md) for the full lifecycle matrix.
 
 ### v0.1 — Next
 
-- Pilot bridge integration directly in the client.
+- Cockpit-to-Pilot workflow continuity improvements.
 - Unified desktop and bridge orchestration from one entrypoint.
 - Multi-session and multi-sandbox management.
 - Enhanced file viewer, diff viewer, and markdown preview.

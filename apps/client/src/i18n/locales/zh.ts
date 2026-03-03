@@ -41,6 +41,14 @@ export const zh: Record<string, string> = {
   'layout.detecting_project_hint': '沙盒已运行，正在识别工作目录...',
   'layout.project_path_copied': '项目路径已复制',
   'layout.project_path_copy_failed': '复制项目路径失败',
+  'layout.open_external': '编辑器',
+  'layout.open_menu_label': '打开方式',
+  'layout.open_in_vscode': 'VS Code',
+  'layout.open_in_cursor': 'Cursor',
+  'layout.open_requires_running': '请先启动本地沙盒后再试。',
+  'layout.open_requires_remote_connected': '请先连接远程沙盒后再试。',
+  'layout.open_in_success': '已在 {editor} 中打开',
+  'layout.open_in_failed': '打开编辑器失败',
   'layout.switch_connection': '切换连接配置',
   'layout.connection_profiles': '连接配置',
   'layout.remote_controls': '远程控制',
@@ -187,6 +195,10 @@ export const zh: Record<string, string> = {
   'connection.credentials_title': '凭证（仅会话期间有效）',
   'connection.credentials_description':
     '凭证仅存储在内存中，应用重启后将被清除。',
+  'connection.credentials_local_hint':
+    '本地沙盒通常不需要。仅当本地 OpenCode/daemon 使用了自定义鉴权时再展开设置。',
+  'connection.credentials_status_configured': '已配置',
+  'connection.credentials_status_not_configured': '未配置',
   'connection.opencode_username': 'OpenCode 用户名',
   'connection.opencode_password': 'OpenCode 密码',
   'connection.daemon_token': 'Daemon 令牌 (X-Deck-Token)',
@@ -329,9 +341,9 @@ export const zh: Record<string, string> = {
   'sandbox.local_title': 'AI 桌面沙盒',
   'sandbox.remote_description': '连接到远程 OpenCode + 桌面沙盒服务。',
   'sandbox.local_description':
-    '启动安全的 Linux 桌面环境，AI 代理可以在其中浏览网页、编写代码并代替您运行应用程序。',
+    '启动一个安全的 Linux 桌面，用于 AI 辅助浏览网页、编写代码和执行应用任务。',
   'sandbox.start_from_chat_hint':
-    '请在左侧 Chat 中点击“启动沙盒”，或使用右上角状态控制。',
+    '请先在左侧点击“启动沙盒”。启动后可从顶部栏使用编辑器、OpenCode 或终端。',
   'sandbox.connect_from_chat_hint':
     '请在左侧 Chat 中点击“连接远程”，或使用右上角状态控制。',
   'sandbox.retry_from_chat_hint':

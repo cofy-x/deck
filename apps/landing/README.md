@@ -5,6 +5,8 @@ Marketing landing page for Deck at `https://deck.cofy-x.space`.
 ## Purpose
 
 - Present Deck value proposition and architecture in a high-conversion single page.
+- Emphasize the cockpit-to-development handoff loop: Start Sandbox -> Observe Desktop -> Continue in Editor/OpenCode/Terminal.
+- Present Pilot as an optional ecosystem capability (secondary to the cockpit narrative).
 - Provide direct conversion paths to Releases, repository, and docs.
 - Stay fully static for lightweight image packaging and manual deployment.
 

@@ -7,14 +7,22 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+## [0.0.1] - 2026-03-03
+
 ### Added
 
+- First stable desktop release line for Deck (`v0.0.1`), rolling up capabilities from the `0.0.1-alpha.*` preview cycle.
+- Added top-bar developer handoff actions for workspace continuation in `Editor (VS Code/Cursor)`, `OpenCode`, and `Terminal`.
+- Added desktop external-editor integration via `open_project_in_editor`, including managed local SSH host alias setup for `deck-local`.
+- Added connection-settings credential collapse behavior with local-first hints and remote auth-error auto-expand.
 - Added reusable shortcut tooltip content UI (`ShortcutTooltipContent`) and shortcut key formatting utilities for platform-aware `mod` display (`⌘` on macOS, `Ctrl` otherwise).
 - Added markdown normalization utility tests covering ordered-list normalization, bullet nesting boundaries, fenced-code protection, nested markdown-fence handling, and unbalanced fence auto-close.
 - Added shortcut formatting unit tests for `userAgentData`, iPadOS desktop-mode UA fallback, and key-sequence formatting behavior.
 
 ### Changed
 
+- Updated product positioning copy in `README.md`, `README.zh-CN.md`, and `apps/landing` to center the `Cockpit + Dev Handoff` workflow and treat Pilot as an optional ecosystem suite.
+- Updated architecture/roadmap wording in docs and landing content to clarify Pilot workflow continuity without implying first-class client UI integration.
 - Updated chat input send control to use an upward arrow icon and tooltip keycap hint (`Enter`), while preserving existing send behavior (`Enter` send, `Shift+Enter` newline, IME guard).
 - Updated right-panel interactions to standardize shortcut tooltips for collapse/expand, fullscreen close (`Esc`), and tab-cycle behavior (`Cmd/Ctrl + Shift + V`) including debug-mode tab cycling.
 - Updated assistant message rendering to support a high-contrast markdown tone for improved readability without changing user message bubble styling.
@@ -22,6 +30,8 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ### Fixed
 
+- Fixed local editor launch host-resolution failures by ensuring Deck-managed SSH include entries are written at top-level in `~/.ssh/config`.
+- Fixed a React hooks ordering issue in `project-open-actions` by keeping hooks unconditional across renders.
 - Fixed tooltip arrow rendering to avoid keycap overlap/visual clipping by using a standard single-arrow shape and configurable arrow visibility.
 - Fixed markdown list rendering for LLM-style outputs using `1)` markers with immediate bullet details, so ordered numbering and nested bullets render consistently.
 - Fixed markdown normalization fence-state handling so list normalization does not leak into fenced `md` examples and nested fence samples are preserved safely.

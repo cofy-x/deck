@@ -12,6 +12,8 @@ It supports both:
 - OpenCode session management (SSE events, retry, permissions, questions)
 - Remote OpenCode fullscreen support with Basic Auth via local bridge proxy
 - Sandbox desktop view via noVNC
+- Top-bar workspace handoff to `Editor (VS Code/Cursor)` for local running sandboxes
+- Top-bar quick actions for `OpenCode` (running local/remote) and `Terminal` (running local only)
 - Provider/model configuration
 - Multi-profile connection management (local + multiple remotes)
 - Session-only credential handling (not persisted)
@@ -82,7 +84,10 @@ is loaded through a local Tauri bridge (`127.0.0.1`) instead of directly using t
 - Top action: `Start Sandbox` / `Stop Sandbox`
 - `Stop Sandbox` stops the container only (no automatic container/data removal)
 - Desktop boot auto-starts computer-use when needed
+- Top-bar `Editor` action opens the current project in VS Code/Cursor via local Remote SSH
+- Top-bar `OpenCode` quick action available
 - Terminal panel available
+- Top-bar `Terminal` quick action available
 
 ### Remote mode
 
@@ -90,6 +95,8 @@ is loaded through a local Tauri bridge (`127.0.0.1`) instead of directly using t
 - Desktop boot checks daemon and `computeruse/status`
 - If computer-use is inactive, user must click **Start Desktop Services**
 - OpenCode fullscreen uses the local bridge when remote Basic Auth is enabled
+- Top-bar `OpenCode` quick action available when the connection is running
+- Top-bar `Editor` action is intentionally unavailable in remote mode
 - Terminal panel is intentionally disabled in current release
 
 ## Local Sandbox Persistence

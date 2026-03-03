@@ -42,6 +42,16 @@ export const en: Record<string, string> = {
     'Sandbox is running. Detecting working directory...',
   'layout.project_path_copied': 'Project path copied',
   'layout.project_path_copy_failed': 'Failed to copy project path',
+  'layout.open_external': 'Editor',
+  'layout.open_menu_label': 'Open in',
+  'layout.open_in_vscode': 'VS Code',
+  'layout.open_in_cursor': 'Cursor',
+  'layout.open_requires_running':
+    'Start the local sandbox first, then try again.',
+  'layout.open_requires_remote_connected':
+    'Connect the remote sandbox first, then try again.',
+  'layout.open_in_success': 'Opened in {editor}',
+  'layout.open_in_failed': 'Failed to open editor',
   'layout.switch_connection': 'Switch connection profile',
   'layout.connection_profiles': 'Connection profiles',
   'layout.remote_controls': 'Remote controls',
@@ -196,6 +206,10 @@ export const en: Record<string, string> = {
   'connection.credentials_title': 'Credentials (Session Only)',
   'connection.credentials_description':
     'Credentials are stored in memory only and cleared after app restart.',
+  'connection.credentials_local_hint':
+    'Usually unnecessary for Local Sandbox. Expand only when local OpenCode/daemon uses custom auth.',
+  'connection.credentials_status_configured': 'Configured',
+  'connection.credentials_status_not_configured': 'Not configured',
   'connection.opencode_username': 'OpenCode Username',
   'connection.opencode_password': 'OpenCode Password',
   'connection.daemon_token': 'Daemon Token (X-Deck-Token)',
@@ -345,9 +359,9 @@ export const en: Record<string, string> = {
   'sandbox.remote_description':
     'Connect to a remote OpenCode + desktop sandbox service.',
   'sandbox.local_description':
-    'Launch a secure Linux desktop environment where the AI agent can browse the web, write code, and run applications on your behalf.',
+    'Start a secure Linux desktop for AI-assisted browsing, coding, and app tasks.',
   'sandbox.start_from_chat_hint':
-    'Use Start Sandbox in Chat (left), or use the status control in the top-right.',
+    'Click Start Sandbox on the left. After startup, use Editor, OpenCode, or Terminal from the top bar.',
   'sandbox.connect_from_chat_hint':
     'Use Connect Remote in Chat (left), or use the status control in the top-right.',
   'sandbox.retry_from_chat_hint':
