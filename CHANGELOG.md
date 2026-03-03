@@ -7,6 +7,28 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+## [0.0.2] - 2026-03-03
+
+### Changed
+
+- Local sandbox startup now returns only after OpenCode health is ready, with explicit cold-start phases and elapsed-time hints across top bar, chat, and desktop loading states.
+- Local project detection is now owned by the Rust lifecycle (`/path`-based), with event-driven updates and a manual retry command.
+- Startup timeouts are now configurable: `DECK_SANDBOX_OPENCODE_HEALTH_TIMEOUT_MS` (default `60s`) and `DECK_SANDBOX_PROJECT_PATH_TIMEOUT_MS` (default `120s`), both clamped to `5s-300s`.
+- Startup credential restore was optimized: reused containers skip replay, auth-only restore skips `global.dispose()`, and dispose is kept for custom-provider restore.
+- Startup query scheduling was tightened: non-critical metadata requests are deferred, and project picker fetches paths/directories only when open (empty search uses immediate child listing).
+- Desktop sandbox log defaults in `apps/client` were switched to production-friendly levels, while `docker/desktop/sandbox-ai/run-opencode.sh` keeps debug-first defaults with env overrides.
+- Landing demo media workflow is now standardized around `apps/landing/public/demo.mp4` + ffmpeg-generated sibling assets, and root READMEs now reference landing media assets directly.
+
+### Fixed
+
+- Local first-start race conditions during `Starting AI Assistant...` by waiting for OpenCode readiness before reporting startup success.
+- Duplicate/competing project-sync calls and cross-profile coupling in `/path` synchronization.
+- Cold-start `/path` slow-path behavior by adding bounded timeouts, scoped in-flight dedupe, and throttled retry diagnostics.
+- Startup API queuing spikes (`/path`, `/config`, `/provider`, `/agent`, etc.) caused by unnecessary auth-only global reinitialization.
+- React hydration warning from nested `button` markup in log viewer rows.
+- Startup status flicker (`running` briefly reverting to `checking`) during transient status polling.
+- Remote session list gating caused by applying local project-detection rules to remote connections.
+
 ## [0.0.1] - 2026-03-03
 
 ### Added

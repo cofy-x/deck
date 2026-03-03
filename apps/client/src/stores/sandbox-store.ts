@@ -19,6 +19,12 @@ export type SandboxStatusValue =
   | 'stopping'
   | 'error';
 
+export type SandboxStartupPhase =
+  | 'none'
+  | 'starting_container'
+  | 'waiting_opencode_health'
+  | 'detecting_project';
+
 export interface PullLogLayer {
   id: string;
   status: string;
@@ -45,10 +51,16 @@ interface SandboxState {
   pullLogLayers: PullLogLayer[];
   /** Non-layer info lines (header, digest, status messages). */
   pullLogInfoLines: string[];
+  /** Current startup phase for local cold-start visibility. */
+  startupPhase: SandboxStartupPhase;
+  /** Timestamp for startup phase begin (ms since epoch). */
+  startupPhaseSinceMs: number | null;
 }
 
 interface SandboxActions {
   setStatus: (status: SandboxStatusValue) => void;
+  setStartupPhase: (phase: SandboxStartupPhase) => void;
+  clearStartupPhase: () => void;
   setError: (message: string) => void;
   setDockerAvailable: (available: boolean) => void;
   setMutating: (isMutating: boolean) => void;
@@ -75,11 +87,23 @@ const initialState: SandboxState = {
   pullLayersTotal: 0,
   pullLogLayers: [],
   pullLogInfoLines: [],
+  startupPhase: 'none',
+  startupPhaseSinceMs: null,
 };
 
 export const useSandboxStore = create<SandboxState & SandboxActions>((set) => ({
   ...initialState,
   setStatus: (status) => set({ status, errorMessage: null }),
+  setStartupPhase: (phase) =>
+    set((state) => {
+      if (state.startupPhase === phase) return {};
+      return {
+        startupPhase: phase,
+        startupPhaseSinceMs: phase === 'none' ? null : Date.now(),
+      };
+    }),
+  clearStartupPhase: () =>
+    set({ startupPhase: 'none', startupPhaseSinceMs: null }),
   setError: (message) => set({ status: 'error', errorMessage: message }),
   setDockerAvailable: (available) => set({ dockerAvailable: available }),
   setMutating: (isMutating) => set({ isMutating }),

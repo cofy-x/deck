@@ -87,6 +87,12 @@ pub struct SandboxStatus {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SandboxStartResult {
+    pub container_id: String,
+    pub created_fresh: bool,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct DockerInfo {
     pub available: bool,
     pub error: Option<String>,

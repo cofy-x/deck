@@ -14,7 +14,11 @@ import { Progress } from '@/components/ui/progress';
 import { SandboxToolbar } from './sandbox-toolbar';
 import { useSandboxStore } from '@/stores/sandbox-store';
 import { useViewerStore } from '@/stores/viewer-store';
-import { useSandboxState, useCancelSandboxStart } from '@/hooks/use-sandbox';
+import {
+  useSandboxState,
+  useCancelSandboxStart,
+  useSandboxStartupProgress,
+} from '@/hooks/use-sandbox';
 import { useActiveConnection } from '@/hooks/use-connection';
 import {
   daemonProbe,
@@ -243,6 +247,19 @@ function SandboxPlaceholder() {
   const setViewerMode = useViewerStore((s) => s.setMode);
   const { isRemote } = useActiveConnection();
   const cancelPull = useCancelSandboxStart();
+  const { phase: startupPhase, elapsedMs: startupElapsedMs } =
+    useSandboxStartupProgress();
+  const startupElapsedSeconds = Math.max(1, Math.floor(startupElapsedMs / 1_000));
+  const startupPhaseDescription =
+    startupPhase === 'waiting_opencode_health'
+      ? t('sandbox.starting_phase_waiting_health').replace(
+          '{seconds}',
+          String(startupElapsedSeconds),
+        )
+      : t('sandbox.starting_phase_starting_container').replace(
+          '{seconds}',
+          String(startupElapsedSeconds),
+        );
 
   if (status === 'error') {
     return (
@@ -308,6 +325,16 @@ function SandboxPlaceholder() {
                   ? t('sandbox.building_desc')
                   : t('sandbox.starting_ai_desc')}
             </p>
+            {status === 'starting' && (
+              <p className="text-center text-xs text-muted-foreground">
+                {startupPhaseDescription}
+              </p>
+            )}
+            {status === 'starting' && startupElapsedMs >= 45_000 && (
+              <p className="text-center text-xs text-muted-foreground">
+                {t('sandbox.starting_ai_cold_hint')}
+              </p>
+            )}
             <div className="w-full space-y-1">
               <Progress value={progressValue} className="w-full" />
               {status === 'pulling' && pullLayersTotal > 0 && (

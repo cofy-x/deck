@@ -38,8 +38,20 @@ export const en: Record<string, string> = {
   'layout.open_project': 'Open Project',
   'layout.no_project': 'No project selected',
   'layout.detecting_project': 'Detecting project...',
+  'layout.detecting_project_with_elapsed': 'Detecting project... {seconds}s',
   'layout.detecting_project_hint':
     'Sandbox is running. Detecting working directory...',
+  'layout.detecting_project_hint_with_elapsed':
+    'Detecting sandbox working directory ({seconds}s elapsed)...',
+  'layout.startup_phase_starting_container':
+    'Starting sandbox container ({seconds}s elapsed)...',
+  'layout.startup_phase_waiting_health':
+    'OpenCode is booting, waiting for health ({seconds}s elapsed)...',
+  'layout.startup_cold_hint':
+    'First cold start can take up to 1-2 minutes.',
+  'layout.startup_very_slow_hint':
+    'Still initializing. This startup is taking longer than usual.',
+  'layout.startup_slow_short_hint': 'cold start',
   'layout.project_path_copied': 'Project path copied',
   'layout.project_path_copy_failed': 'Failed to copy project path',
   'layout.open_external': 'Editor',
@@ -73,6 +85,9 @@ export const en: Record<string, string> = {
   'chat.welcome_auth_error_hint':
     'Update OpenCode credentials in Settings, then retry the connection.',
   'chat.new_session': 'New',
+  'chat.project_detecting': 'Preparing workspace... {seconds}s',
+  'chat.project_detecting_wait_health':
+    'Starting AI Assistant services... {seconds}s',
   'chat.archive_session': 'Archive session',
   'chat.untitled_session': 'Untitled Session',
   'chat.placeholder_disabled': 'Start the sandbox to begin chatting...',
@@ -354,6 +369,12 @@ export const en: Record<string, string> = {
   'sandbox.starting_ai': 'Starting AI Assistant...',
   'sandbox.starting_ai_desc':
     'Initializing the desktop environment and AI services.',
+  'sandbox.starting_phase_starting_container':
+    'Starting sandbox container ({seconds}s elapsed)...',
+  'sandbox.starting_phase_waiting_health':
+    'Waiting for OpenCode health check ({seconds}s elapsed)...',
+  'sandbox.starting_ai_cold_hint':
+    'First cold start may take 1-2 minutes while OpenCode initializes.',
   'sandbox.remote_title': 'Remote AI Sandbox',
   'sandbox.local_title': 'AI Desktop Sandbox',
   'sandbox.remote_description':

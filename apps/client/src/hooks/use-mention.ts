@@ -7,14 +7,16 @@ import { useQuery } from '@tanstack/react-query';
 import type { Agent } from '@opencode-ai/sdk/v2/client';
 import { unwrap } from '@/lib/opencode';
 import { useOpenCodeClient } from '@/hooks/use-opencode-client';
+import { useConnectionScope } from '@/hooks/use-connection';
 
 // ---------------------------------------------------------------------------
 // Query keys
 // ---------------------------------------------------------------------------
 
 const MENTION_KEYS = {
-  agents: ['mention', 'agents'] as const,
-  files: (query: string) => ['mention', 'files', query] as const,
+  agents: (scope: string) => ['mention', scope, 'agents'] as const,
+  files: (scope: string, query: string, directory?: string | null) =>
+    ['mention', scope, 'files', directory ?? '', query] as const,
 };
 
 // ---------------------------------------------------------------------------
@@ -34,11 +36,13 @@ export type AgentInfo = Pick<
  * Fetch subagents available for @ mention.
  * Filters for agents with mode === 'subagent' or mode === 'all', and not hidden.
  */
-export function useSubagents() {
+export function useSubagents(options?: { enabled?: boolean }) {
   const client = useOpenCodeClient();
+  const scope = useConnectionScope();
+  const isEnabled = options?.enabled ?? true;
 
   return useQuery({
-    queryKey: MENTION_KEYS.agents,
+    queryKey: MENTION_KEYS.agents(scope),
     queryFn: async (): Promise<AgentInfo[]> => {
       if (!client) return [];
       const result = await client.app.agents();
@@ -50,7 +54,7 @@ export function useSubagents() {
         (a) => !a.hidden && (a.mode === 'subagent' || a.mode === 'all'),
       );
     },
-    enabled: !!client,
+    enabled: !!client && isEnabled,
     staleTime: 60_000,
   });
 }
@@ -60,11 +64,17 @@ export function useSubagents() {
  * Calls GET /find/file?query=...&dirs=true
  * Accepts an optional directory scope for the search.
  */
-export function useFindFiles(query: string, directory?: string | null) {
+export function useFindFiles(
+  query: string,
+  directory?: string | null,
+  options?: { enabled?: boolean },
+) {
   const client = useOpenCodeClient();
+  const scope = useConnectionScope();
+  const isEnabled = options?.enabled ?? true;
 
   return useQuery({
-    queryKey: MENTION_KEYS.files(query),
+    queryKey: MENTION_KEYS.files(scope, query, directory),
     queryFn: async (): Promise<string[]> => {
       if (!client || !query) return [];
       const result = await client.find.files({
@@ -75,7 +85,7 @@ export function useFindFiles(query: string, directory?: string | null) {
       const data = unwrap(result);
       return Array.isArray(data) ? data : [];
     },
-    enabled: !!client && query.length > 0,
+    enabled: !!client && query.length > 0 && isEnabled,
     staleTime: 5_000,
   });
 }

@@ -27,7 +27,7 @@ export function McpDialog() {
   const open = useChatStore((s) => s.mcpDialogOpen);
   const setOpen = useChatStore((s) => s.setMcpDialogOpen);
   const requestInputFocus = useChatStore((s) => s.requestInputFocus);
-  const { data: mcpStatuses, isLoading } = useMcpStatus();
+  const { data: mcpStatuses, isLoading } = useMcpStatus({ enabled: open });
   const toggle = useMcpToggle();
 
   const handleOpenChange = useCallback(

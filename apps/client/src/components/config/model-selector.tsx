@@ -42,6 +42,7 @@ import type { FlatModel } from '@/hooks/use-config';
 import { useModelPreferencesStore } from '@/stores/model-preferences-store';
 import { useConfigStore } from '@/stores/config-store';
 import { useChatStore } from '@/stores/chat-store';
+import { useProjectStore } from '@/stores/project-store';
 import { t } from '@/i18n';
 
 // ---------------------------------------------------------------------------
@@ -194,7 +195,11 @@ interface ModelSelectorProps {
 
 export function ModelSelector({ className, fullWidth }: ModelSelectorProps) {
   const [open, setOpen] = useState(false);
-  const { models } = useProviders();
+  const currentDirectory = useProjectStore((s) => s.currentDirectory);
+  const shouldPreloadProviders = !!fullWidth || !!currentDirectory;
+  const { models } = useProviders({
+    enabled: open || shouldPreloadProviders,
+  });
 
   // Validate stored model against current providers on load
   useValidateStoredModel(models);

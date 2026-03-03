@@ -32,7 +32,11 @@ import { BrainStatusBadge } from '@/components/sandbox/status-badge';
 import { ModelSelector } from '@/components/config/model-selector';
 import { useChatStore } from '@/stores/chat-store';
 import { useProjectStore } from '@/stores/project-store';
-import { useSandboxState, useStartSandbox } from '@/hooks/use-sandbox';
+import {
+  useSandboxStartupProgress,
+  useSandboxState,
+  useStartSandbox,
+} from '@/hooks/use-sandbox';
 import { useModelPreferencesStore } from '@/stores/model-preferences-store';
 import { useViewerStore } from '@/stores/viewer-store';
 import { useSandboxStore } from '@/stores/sandbox-store';
@@ -172,11 +176,37 @@ export function ChatPanel() {
     isAuthConnectionErrorMessage(sandboxErrorMessage);
 
   const currentDirectory = useProjectStore((s) => s.currentDirectory);
+  const { phase: startupPhase, elapsedMs: startupElapsedMs } =
+    useSandboxStartupProgress();
   const recentModels = useModelPreferencesStore((s) => s.recent);
   const expandPanel = useViewerStore((s) => s.expandPanel);
   const switchToDesktop = useViewerStore((s) => s.switchToDesktop);
   const switchToOpencode = useViewerStore((s) => s.switchToOpencode);
   const switchToTerminal = useViewerStore((s) => s.switchToTerminal);
+  const projectDetectElapsedSeconds = Math.max(
+    1,
+    Math.floor(startupElapsedMs / 1_000),
+  );
+  const slowStartupHint =
+    startupElapsedMs >= 120_000
+      ? t('layout.startup_very_slow_hint')
+      : startupElapsedMs >= 45_000
+        ? t('layout.startup_cold_hint')
+        : null;
+  const isProjectDetecting = !isRemote && isRunning && !currentDirectory;
+  const projectDetectingBaseHint =
+    startupPhase === 'waiting_opencode_health'
+      ? t('chat.project_detecting_wait_health').replace(
+          '{seconds}',
+          String(projectDetectElapsedSeconds),
+        )
+      : t('chat.project_detecting').replace(
+          '{seconds}',
+          String(projectDetectElapsedSeconds),
+        );
+  const projectDetectingHint = slowStartupHint
+    ? `${projectDetectingBaseHint} ${slowStartupHint}`
+    : projectDetectingBaseHint;
 
   // Track previous directory to detect project switches
   const prevDirectoryRef = useRef(currentDirectory);
@@ -186,7 +216,7 @@ export function ChatPanel() {
   const pendingCreatedSessionRef = useRef<string | null>(null);
 
   const { data: sessions, isLoading: sessionsLoading } =
-    useSessionList(currentDirectory);
+    useSessionList(currentDirectory, { enabled: !isProjectDetecting });
   const visibleSessions = useMemo(
     () => sessions?.filter((s) => !s.time.archived) ?? [],
     [sessions],
@@ -525,6 +555,14 @@ export function ChatPanel() {
           {t('chat.new_session')}
         </Button>
       </div>
+
+      {isProjectDetecting && (
+        <div className="flex shrink-0 items-center border-b bg-muted/20 px-3 py-1.5">
+          <p className="text-[11px] text-muted-foreground">
+            {projectDetectingHint}
+          </p>
+        </div>
+      )}
 
       {/* Session selector (compact list) */}
       {visibleSessions.length > 0 && (

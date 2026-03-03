@@ -163,45 +163,47 @@ function LogEntryItem({
 
   return (
     <Collapsible open={open} onOpenChange={setOpen}>
-      <CollapsibleTrigger
+      <div
         className={cn(
           'group flex w-full items-center gap-2 border-b px-3 py-1.5 text-[11px] transition-colors hover:bg-muted/50',
           isPinned && 'bg-primary/5',
         )}
       >
-        {open ? (
-          <ChevronDown className="h-3 w-3 shrink-0 text-muted-foreground" />
-        ) : (
-          <ChevronRight className="h-3 w-3 shrink-0 text-muted-foreground" />
-        )}
-        <span className="shrink-0 font-mono text-muted-foreground">
-          {formatTime(entry.timestamp)}
-        </span>
-        <Badge
-          variant="outline"
-          className={cn(
-            'shrink-0 px-1.5 py-0 text-[10px] font-mono',
-            methodColor(entry.method),
+        <CollapsibleTrigger className="flex min-w-0 flex-1 items-center gap-2 text-left">
+          {open ? (
+            <ChevronDown className="h-3 w-3 shrink-0 text-muted-foreground" />
+          ) : (
+            <ChevronRight className="h-3 w-3 shrink-0 text-muted-foreground" />
           )}
-        >
-          {entry.method}
-        </Badge>
-        <span className={cn('shrink-0 font-mono', statusColor(entry.status))}>
-          {entry.status ?? '---'}
-        </span>
-        {entry.durationMs !== undefined && (
-          <span className="shrink-0 text-muted-foreground">
-            {entry.durationMs}ms
+          <span className="shrink-0 font-mono text-muted-foreground">
+            {formatTime(entry.timestamp)}
           </span>
-        )}
-        <span className="flex-1 truncate text-left font-mono text-muted-foreground">
-          {entry.summary ?? shortenUrl(entry.url)}
-        </span>
-        {entry.error && (
-          <Badge variant="destructive" className="shrink-0 text-[10px]">
-            Error
+          <Badge
+            variant="outline"
+            className={cn(
+              'shrink-0 px-1.5 py-0 text-[10px] font-mono',
+              methodColor(entry.method),
+            )}
+          >
+            {entry.method}
           </Badge>
-        )}
+          <span className={cn('shrink-0 font-mono', statusColor(entry.status))}>
+            {entry.status ?? '---'}
+          </span>
+          {entry.durationMs !== undefined && (
+            <span className="shrink-0 text-muted-foreground">
+              {entry.durationMs}ms
+            </span>
+          )}
+          <span className="flex-1 truncate text-left font-mono text-muted-foreground">
+            {entry.summary ?? shortenUrl(entry.url)}
+          </span>
+          {entry.error && (
+            <Badge variant="destructive" className="shrink-0 text-[10px]">
+              Error
+            </Badge>
+          )}
+        </CollapsibleTrigger>
         {/* Pin toggle */}
         <button
           type="button"
@@ -220,7 +222,7 @@ function LogEntryItem({
             <Pin className="h-3 w-3" />
           )}
         </button>
-      </CollapsibleTrigger>
+      </div>
 
       <CollapsibleContent>
         <div className="border-b bg-muted/20 px-3 py-2 text-[11px]">

@@ -54,9 +54,10 @@ export function getClientCommands(): ClientCommand[] {
  * Fetch server-side commands from the OpenCode command API.
  * Returns Command[] from the SDK (name, description?, agent?, etc.)
  */
-export function useServerCommands() {
+export function useServerCommands(options?: { enabled?: boolean }) {
   const client = useOpenCodeClient();
   const scope = useConnectionScope();
+  const isEnabled = options?.enabled ?? true;
 
   return useQuery({
     queryKey: COMMAND_KEYS.list(scope),
@@ -66,7 +67,7 @@ export function useServerCommands() {
       const data = unwrap(result);
       return Array.isArray(data) ? data : [];
     },
-    enabled: !!client,
+    enabled: !!client && isEnabled,
     staleTime: 60_000,
   });
 }

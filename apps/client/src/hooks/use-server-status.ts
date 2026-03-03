@@ -33,9 +33,10 @@ export const STATUS_KEYS = {
  * Fetch MCP server statuses.
  * Returns a map of server name to McpStatus.
  */
-export function useMcpStatus() {
+export function useMcpStatus(options?: { enabled?: boolean }) {
   const client = useOpenCodeClient();
   const scope = useConnectionScope();
+  const isEnabled = options?.enabled ?? true;
 
   return useQuery({
     queryKey: STATUS_KEYS.mcp(scope),
@@ -44,7 +45,7 @@ export function useMcpStatus() {
       const result = await client.mcp.status();
       return unwrap(result) ?? {};
     },
-    enabled: !!client,
+    enabled: !!client && isEnabled,
     refetchInterval: 15_000,
     staleTime: 10_000,
   });
@@ -54,9 +55,10 @@ export function useMcpStatus() {
  * Fetch LSP server statuses.
  * Returns an array of LspStatus entries.
  */
-export function useLspStatus() {
+export function useLspStatus(options?: { enabled?: boolean }) {
   const client = useOpenCodeClient();
   const scope = useConnectionScope();
+  const isEnabled = options?.enabled ?? true;
 
   return useQuery({
     queryKey: STATUS_KEYS.lsp(scope),
@@ -65,7 +67,7 @@ export function useLspStatus() {
       const result = await client.lsp.status();
       return unwrap(result) ?? [];
     },
-    enabled: !!client,
+    enabled: !!client && isEnabled,
     refetchInterval: 15_000,
     staleTime: 10_000,
   });
@@ -75,9 +77,10 @@ export function useLspStatus() {
  * Fetch formatter statuses.
  * Returns an array of FormatterStatus entries.
  */
-export function useFormatterStatus() {
+export function useFormatterStatus(options?: { enabled?: boolean }) {
   const client = useOpenCodeClient();
   const scope = useConnectionScope();
+  const isEnabled = options?.enabled ?? true;
 
   return useQuery({
     queryKey: STATUS_KEYS.formatter(scope),
@@ -86,7 +89,7 @@ export function useFormatterStatus() {
       const result = await client.formatter.status();
       return unwrap(result) ?? [];
     },
-    enabled: !!client,
+    enabled: !!client && isEnabled,
     refetchInterval: 30_000,
     staleTime: 20_000,
   });

@@ -14,6 +14,9 @@ HOST_WEB_TERMINAL_PORT="${HOST_WEB_TERMINAL_PORT:-12222}"
 OPENCODE_SERVER_USERNAME="${OPENCODE_SERVER_USERNAME:-deck}"
 OPENCODE_SERVER_PASSWORD="${OPENCODE_SERVER_PASSWORD:-deck}"
 DECK_DAEMON_TOKEN="${DECK_DAEMON_TOKEN:-}"
+DECK_LOG_LEVEL="${DECK_LOG_LEVEL:-debug}"
+OPENCODE_LOG_LEVEL="${OPENCODE_LOG_LEVEL:-DEBUG}"
+OPENCODE_PRINT_LOGS="${OPENCODE_PRINT_LOGS:-true}"
 
 detect_lan_ip() {
   # Prefer 192.168.x.x for quick REMOTE-mode testing in LAN.
@@ -57,7 +60,7 @@ docker_args=(
   -e NO_VNC_PORT=6080
   -e VNC_RESOLUTION=1280x720
   -e VNC_USER=deck
-  -e DECK_LOG_LEVEL=debug
+  -e "DECK_LOG_LEVEL=${DECK_LOG_LEVEL}"
   -e "OPENCODE_SERVER_USERNAME=${OPENCODE_SERVER_USERNAME}"
   -e "OPENCODE_SERVER_PASSWORD=${OPENCODE_SERVER_PASSWORD}"
 )
@@ -66,10 +69,19 @@ if [ -n "${DECK_DAEMON_TOKEN}" ]; then
   docker_args+=(-e "DECK_DAEMON_TOKEN=${DECK_DAEMON_TOKEN}")
 fi
 
+opencode_cmd=(
+  opencode serve --hostname 0.0.0.0 --port 4096
+  --log-level "${OPENCODE_LOG_LEVEL}"
+)
+
+if [ "${OPENCODE_PRINT_LOGS}" = "true" ]; then
+  opencode_cmd+=(--print-logs)
+fi
+
 docker run \
   "${docker_args[@]}" \
   "$IMAGE_NAME" \
-  opencode serve --hostname 0.0.0.0 --port 4096 --print-logs --log-level DEBUG
+  "${opencode_cmd[@]}"
 
 echo "Desktop sandbox AI deployed."
 echo

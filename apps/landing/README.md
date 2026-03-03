@@ -24,6 +24,35 @@ pnpm --filter @cofy-x/deck-landing run typecheck
 pnpm --filter @cofy-x/deck-landing run build
 ```
 
+## Demo Assets
+
+`public/demo.mp4` is the source of truth for the hero demo.
+
+After replacing `demo.mp4`, regenerate sibling assets with:
+
+```bash
+pnpm --filter @cofy-x/deck-landing run assets:demo
+```
+
+Generated files:
+
+- `public/demo.webm`
+- `public/demo.gif` (first 10 seconds fallback for browsers without video support)
+- `public/demo-poster.png`
+
+Requirements:
+
+- `ffmpeg` available in `PATH`
+
+Optional tuning env vars:
+
+- `WEBM_WIDTH` (default `1280`)
+- `WEBM_CRF` (default `34`)
+- `GIF_WIDTH` (default `960`)
+- `GIF_FPS` (default `10`)
+- `GIF_DURATION_SECONDS` (default `10`)
+- `POSTER_TIMESTAMP` (default `00:00:01`)
+
 ## Deployment
 
 - Docker assets: `docker/landing/`

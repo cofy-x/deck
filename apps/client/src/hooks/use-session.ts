@@ -271,10 +271,14 @@ async function clearRetriedUserMessageParts(params: {
 /**
  * List sessions from the OpenCode server, optionally scoped to a directory.
  */
-export function useSessionList(directory?: string | null) {
+export function useSessionList(
+  directory?: string | null,
+  options?: { enabled?: boolean },
+) {
   const client = useOpenCodeClient();
   const scope = useConnectionScope();
   const dir = directory ?? undefined;
+  const isEnabled = options?.enabled ?? true;
 
   return useQuery({
     queryKey: SESSION_KEYS.list(scope, dir),
@@ -286,7 +290,7 @@ export function useSessionList(directory?: string | null) {
       });
       return unwrap(result) ?? [];
     },
-    enabled: !!client,
+    enabled: !!client && isEnabled,
   });
 }
 

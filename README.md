@@ -15,12 +15,12 @@
 
 <p align="center">
   <a href="https://github.com/cofy-x/deck" style="display: inline-block; border: 1px solid #e1e4e8; border-radius: 12px; overflow: hidden; box-shadow: 0 10px 30px rgba(0,0,0,0.1); line-height: 0;">
-    <img src="./docs/media/client/demo.gif" alt="Deck Client Demo" width="800" style="display: block; border-radius: 0;">
+    <img src="./apps/landing/public/demo.gif" alt="Deck Client Demo" width="800" style="display: block; border-radius: 0;">
   </a>
 </p>
 
 > [!NOTE]
-> Deck is currently in the **stable desktop release** line (`v0.0.1`).
+> Deck is currently in the **stable desktop release** line.
 > Official desktop downloads are currently macOS DMG (signed and notarized).
 > Windows and Linux desktop builds are planned on the roadmap.
 
@@ -142,7 +142,7 @@ graph LR
 ```
 deck/
 ├── apps/
-│   ├── client/          # Tauri v2 desktop cockpit (primary v0.0.1 surface)
+│   ├── client/          # Tauri v2 desktop cockpit (primary desktop surface)
 │   ├── pilot/           # Optional automation suite for orchestration workflows
 │   │   ├── bridge/      #   Messaging bridge adapters
 │   │   ├── host/        #   Headless CLI orchestrator

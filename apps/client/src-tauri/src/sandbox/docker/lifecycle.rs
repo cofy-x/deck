@@ -1,9 +1,13 @@
 use std::fs;
 use std::path::Path;
+use std::time::{Duration, Instant};
 
 use log::{error, info};
+use serde::Deserialize;
 
-use crate::sandbox::config::{SandboxConfig, SandboxPorts, SandboxStatus, DEFAULT_CONTAINER_NAME};
+use crate::sandbox::config::{
+    SandboxConfig, SandboxPorts, SandboxStartResult, SandboxStatus, DEFAULT_CONTAINER_NAME,
+};
 
 use super::command::docker_cmd;
 use super::paths::{SandboxMountPaths, CONTAINER_WORKSPACE_DIR};
@@ -12,6 +16,79 @@ use super::probe::{
     container_image_id_checked, image_id_checked, running_container_id_by_exact_name,
     running_container_id_by_exact_name_checked,
 };
+
+#[derive(Debug, Deserialize)]
+struct OpencodeHealth {
+    healthy: bool,
+}
+
+fn env_non_empty(name: &str) -> Option<String> {
+    std::env::var(name).ok().and_then(|value| {
+        let trimmed = value.trim();
+        if trimmed.is_empty() {
+            None
+        } else {
+            Some(trimmed.to_string())
+        }
+    })
+}
+
+fn env_bool(name: &str, default: bool) -> bool {
+    let Some(value) = env_non_empty(name) else {
+        return default;
+    };
+    matches!(
+        value.to_ascii_lowercase().as_str(),
+        "1" | "true" | "yes" | "on"
+    )
+}
+
+fn resolve_opencode_log_level() -> String {
+    let Some(raw) = env_non_empty("DECK_SANDBOX_OPENCODE_LOG_LEVEL") else {
+        return "INFO".to_string();
+    };
+    let normalized = raw.to_ascii_uppercase();
+    match normalized.as_str() {
+        "TRACE" | "DEBUG" | "INFO" | "WARN" | "ERROR" => normalized,
+        _ => "INFO".to_string(),
+    }
+}
+
+pub fn wait_for_opencode_healthy(port: u16, timeout_ms: u64) -> Result<(), String> {
+    let start = Instant::now();
+    let mut last_error: Option<String> = None;
+    let url = format!("http://127.0.0.1:{port}/global/health");
+
+    while start.elapsed().as_millis() < u128::from(timeout_ms) {
+        match ureq::get(&url).call() {
+            Ok(response) if response.status() == 200 => {
+                match response.into_json::<OpencodeHealth>() {
+                    Ok(health) if health.healthy => return Ok(()),
+                    Ok(_) => {
+                        last_error =
+                            Some("OpenCode health endpoint reported unhealthy".to_string());
+                    }
+                    Err(error) => {
+                        last_error =
+                            Some(format!("Failed to parse OpenCode health response: {error}"));
+                    }
+                }
+            }
+            Ok(response) => {
+                last_error = Some(format!(
+                    "OpenCode health endpoint status: {}",
+                    response.status()
+                ));
+            }
+            Err(error) => {
+                last_error = Some(format!("OpenCode health request failed: {error}"));
+            }
+        }
+        std::thread::sleep(Duration::from_millis(250));
+    }
+
+    Err(last_error.unwrap_or_else(|| format!("Timed out waiting for OpenCode health: {url}")))
+}
 
 pub fn get_container_status(name: Option<&str>) -> SandboxStatus {
     let container_name = name.unwrap_or(DEFAULT_CONTAINER_NAME);
@@ -30,11 +107,18 @@ pub fn get_container_status(name: Option<&str>) -> SandboxStatus {
     }
 }
 
-pub fn start_container(config: &SandboxConfig, storage_root: &Path) -> Result<String, String> {
+pub fn start_container(
+    config: &SandboxConfig,
+    storage_root: &Path,
+) -> Result<SandboxStartResult, String> {
     let image = config.image();
     let name = config.container_name();
     let persistence = config.persistence();
     let ports = SandboxPorts::default();
+    let daemon_log_level =
+        env_non_empty("DECK_SANDBOX_DAEMON_LOG_LEVEL").unwrap_or_else(|| "info".to_string());
+    let opencode_log_level = resolve_opencode_log_level();
+    let opencode_print_logs = env_bool("DECK_SANDBOX_OPENCODE_PRINT_LOGS", false);
 
     info!(
         "[deck-docker] Starting sandbox container '{}' with image '{}'",
@@ -112,7 +196,10 @@ pub fn start_container(config: &SandboxConfig, storage_root: &Path) -> Result<St
                     "[deck-docker] Container '{}' already running (ID: {})",
                     name, container_id
                 );
-                return Ok(container_id);
+                return Ok(SandboxStartResult {
+                    container_id,
+                    created_fresh: false,
+                });
             }
 
             info!(
@@ -129,13 +216,19 @@ pub fn start_container(config: &SandboxConfig, storage_root: &Path) -> Result<St
             }
 
             if let Some(container_id) = running_container_id_by_exact_name_checked(name)? {
-                return Ok(container_id);
+                return Ok(SandboxStartResult {
+                    container_id,
+                    created_fresh: false,
+                });
             }
             let stdout = String::from_utf8_lossy(&start_output.stdout)
                 .trim()
                 .to_string();
             if !stdout.is_empty() {
-                return Ok(stdout);
+                return Ok(SandboxStartResult {
+                    container_id: stdout,
+                    created_fresh: false,
+                });
             }
             return Err("Container started but ID could not be resolved".to_string());
         }
@@ -181,7 +274,7 @@ pub fn start_container(config: &SandboxConfig, storage_root: &Path) -> Result<St
         "-e".to_string(),
         "VNC_USER=deck".to_string(),
         "-e".to_string(),
-        "DECK_LOG_LEVEL=debug".to_string(),
+        format!("DECK_LOG_LEVEL={daemon_log_level}"),
     ];
 
     if persistence.enabled() {
@@ -201,10 +294,12 @@ pub fn start_container(config: &SandboxConfig, storage_root: &Path) -> Result<St
         "0.0.0.0".to_string(),
         "--port".to_string(),
         ports.opencode.to_string(),
-        "--print-logs".to_string(),
         "--log-level".to_string(),
-        "DEBUG".to_string(),
+        opencode_log_level,
     ]);
+    if opencode_print_logs {
+        args.push("--print-logs".to_string());
+    }
 
     let output = docker_cmd().args(args).output().map_err(|error| {
         let message = format!("Failed to start container: {}", error);
@@ -218,7 +313,10 @@ pub fn start_container(config: &SandboxConfig, storage_root: &Path) -> Result<St
             "[deck-docker] Container started successfully, ID: {}",
             container_id
         );
-        Ok(container_id)
+        Ok(SandboxStartResult {
+            container_id,
+            created_fresh: true,
+        })
     } else {
         let stderr = String::from_utf8_lossy(&output.stderr).to_string();
         let message = format!("Failed to start container: {}", stderr);

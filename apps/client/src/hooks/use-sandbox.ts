@@ -3,7 +3,7 @@
  * Copyright 2026 cofy-x
  * SPDX-License-Identifier: Apache-2.0
  */
-import { useCallback, useEffect, useRef } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { invoke } from '@tauri-apps/api/core';
 import { listen, type UnlistenFn } from '@tauri-apps/api/event';
@@ -19,6 +19,7 @@ import {
 import { useProjectStore } from '@/stores/project-store';
 import {
   useSandboxStore,
+  type SandboxStartupPhase,
   type SandboxStatusValue,
 } from '@/stores/sandbox-store';
 
@@ -65,6 +66,11 @@ interface SandboxConfig {
   };
 }
 
+interface SandboxStartResult {
+  container_id: string;
+  created_fresh: boolean;
+}
+
 interface PullProgress {
   stage: string;
   message: string;
@@ -93,6 +99,62 @@ interface ServerConnectionInput {
   password?: string;
 }
 
+interface ProjectSyncOptions {
+  healthTimeoutMs?: number;
+  healthPollMs?: number;
+  pathTimeoutMs?: number;
+  skipHealthCheck?: boolean;
+  source?: string;
+  scopeKey?: string;
+  markDetectingProject?: boolean;
+  force?: boolean;
+}
+
+const projectDirectorySyncInFlight = new Map<string, Promise<boolean>>();
+const projectSyncReuseLogAtMs = new Map<string, number>();
+const PROJECT_SYNC_REUSE_LOG_THROTTLE_MS = 10_000;
+const LOCAL_PROJECT_DETECT_RETRY_COOLDOWN_MS = 15_000;
+const localProjectDetectLastRequestedAtMs = new Map<string, number>();
+
+interface StartupPhaseEvent {
+  phase: Exclude<SandboxStartupPhase, 'none'> | 'opencode_healthy';
+}
+
+interface SandboxProjectDetectingEvent {
+  trigger: string;
+}
+
+interface SandboxProjectDetectedEvent {
+  trigger: string;
+  directory: string;
+  elapsed_ms: number;
+}
+
+interface SandboxProjectDetectTimeoutEvent {
+  trigger: string;
+  elapsed_ms: number;
+  reason: string;
+}
+
+function withTimeout<T>(
+  promise: Promise<T>,
+  timeoutMs: number,
+  timeoutMessage: string,
+): Promise<T> {
+  return new Promise<T>((resolve, reject) => {
+    const timer = window.setTimeout(() => reject(new Error(timeoutMessage)), timeoutMs);
+    promise
+      .then((value) => {
+        window.clearTimeout(timer);
+        resolve(value);
+      })
+      .catch((error) => {
+        window.clearTimeout(timer);
+        reject(error);
+      });
+  });
+}
+
 function buildClient(input: ServerConnectionInput) {
   return createClient({
     baseUrl: input.baseUrl,
@@ -109,40 +171,138 @@ async function verifyRemoteConnection(input: ServerConnectionInput) {
 }
 
 async function fetchDefaultProjectDirectory(
-  input: ServerConnectionInput & {
-    healthTimeoutMs?: number;
-    healthPollMs?: number;
-  },
+  input: ServerConnectionInput & ProjectSyncOptions,
 ): Promise<string | null> {
+  const source = input.source ?? 'unknown';
+  const startedAt = Date.now();
   try {
     const client = buildClient(input);
-    await waitForHealthy(client, {
-      timeoutMs: input.healthTimeoutMs ?? 15_000,
-      pollMs: input.healthPollMs ?? 500,
-    });
-    const path = unwrap(await client.path.get());
+    if (!input.skipHealthCheck) {
+      console.info('[project-sync] waiting for health', {
+        source,
+        timeoutMs: input.healthTimeoutMs ?? 15_000,
+        pollMs: input.healthPollMs ?? 500,
+      });
+      await waitForHealthy(client, {
+        timeoutMs: input.healthTimeoutMs ?? 15_000,
+        pollMs: input.healthPollMs ?? 500,
+      });
+    }
+    const pathTimeoutMs = input.pathTimeoutMs ?? 30_000;
+    const beforePath = Date.now();
+    const path = unwrap(
+      await withTimeout(
+        client.path.get(),
+        pathTimeoutMs,
+        `OpenCode /path timed out after ${pathTimeoutMs}ms`,
+      ),
+    );
     const directory = path.directory?.trim();
+    const pathElapsedMs = Date.now() - beforePath;
+    const totalElapsedMs = Date.now() - startedAt;
+    console.info('[project-sync] fetched default directory', {
+      source,
+      directory: directory ?? null,
+      pathElapsedMs,
+      totalElapsedMs,
+    });
     return directory && directory.length > 0 ? directory : null;
-  } catch {
+  } catch (error) {
+    console.warn('[project-sync] failed to fetch default directory', {
+      source,
+      totalElapsedMs: Date.now() - startedAt,
+      error: error instanceof Error ? error.message : String(error),
+    });
     return null;
   }
 }
 
-async function syncProjectDirectoryFromServer(input: {
-  baseUrl: string;
-  username?: string;
-  password?: string;
-  healthTimeoutMs?: number;
-  healthPollMs?: number;
-}): Promise<boolean> {
-  const directory = await fetchDefaultProjectDirectory(input);
-  if (!directory) return false;
-
-  const project = useProjectStore.getState();
-  if (project.currentDirectory !== directory) {
-    project.setDirectory(directory);
+async function syncProjectDirectoryFromServer(
+  input: ServerConnectionInput & ProjectSyncOptions,
+): Promise<boolean> {
+  const scopeKey = input.scopeKey ?? input.baseUrl;
+  if (input.markDetectingProject) {
+    useSandboxStore.getState().setStartupPhase('detecting_project');
   }
-  return true;
+
+  if (!input.force) {
+    const inFlight = projectDirectorySyncInFlight.get(scopeKey);
+    if (inFlight) {
+      const now = Date.now();
+      const lastLogAt = projectSyncReuseLogAtMs.get(scopeKey) ?? 0;
+      if (now - lastLogAt >= PROJECT_SYNC_REUSE_LOG_THROTTLE_MS) {
+        projectSyncReuseLogAtMs.set(scopeKey, now);
+        console.info('[project-sync] reusing in-flight sync request', {
+          source: input.source ?? 'unknown',
+          scopeKey,
+        });
+      }
+      return inFlight;
+    }
+  }
+
+  const source = input.source ?? 'unknown';
+  const request = (async (): Promise<boolean> => {
+    const startedAt = Date.now();
+    const directory = await fetchDefaultProjectDirectory(input);
+    if (!directory) return false;
+
+    const project = useProjectStore.getState();
+    if (project.currentDirectory !== directory) {
+      project.setDirectory(directory);
+    }
+    useSandboxStore.getState().clearStartupPhase();
+    console.info('[project-sync] directory synced', {
+      source,
+      directory,
+      scopeKey,
+      totalElapsedMs: Date.now() - startedAt,
+    });
+    return true;
+  })().finally(() => {
+    projectDirectorySyncInFlight.delete(scopeKey);
+    projectSyncReuseLogAtMs.delete(scopeKey);
+  });
+
+  projectDirectorySyncInFlight.set(scopeKey, request);
+  return request;
+}
+
+async function requestLocalProjectDetection(
+  input: {
+    scopeKey: string;
+    source: string;
+    force?: boolean;
+  },
+): Promise<boolean> {
+  const now = Date.now();
+  const lastRequestedAtMs =
+    localProjectDetectLastRequestedAtMs.get(input.scopeKey) ?? 0;
+  if (
+    !input.force &&
+    now - lastRequestedAtMs < LOCAL_PROJECT_DETECT_RETRY_COOLDOWN_MS
+  ) {
+    return false;
+  }
+
+  localProjectDetectLastRequestedAtMs.set(input.scopeKey, now);
+  try {
+    await invoke<void>('retry_local_project_detection');
+    console.info('[project-sync] requested local project detection', {
+      source: input.source,
+      scopeKey: input.scopeKey,
+      force: !!input.force,
+    });
+    return true;
+  } catch (error) {
+    localProjectDetectLastRequestedAtMs.delete(input.scopeKey);
+    console.warn('[project-sync] failed to request local project detection', {
+      source: input.source,
+      scopeKey: input.scopeKey,
+      error: error instanceof Error ? error.message : String(error),
+    });
+    return false;
+  }
 }
 
 function clearProjectDirectory() {
@@ -150,6 +310,8 @@ function clearProjectDirectory() {
   if (project.currentDirectory) {
     project.setDirectory(null);
   }
+  localProjectDetectLastRequestedAtMs.clear();
+  useSandboxStore.getState().clearStartupPhase();
 }
 
 /**
@@ -159,6 +321,7 @@ function clearProjectDirectory() {
 async function restoreProviderCredentials(
   input: ServerConnectionInput & { profileId: string },
 ): Promise<boolean> {
+  const startedAt = Date.now();
   try {
     const [credentials, customProviders] = await Promise.all([
       listCredentials(input.profileId),
@@ -170,6 +333,8 @@ async function restoreProviderCredentials(
     }
 
     const client = buildClient(input);
+    let restoredCustomProviderCount = 0;
+    let restoredCredentialCount = 0;
 
     // Restore custom provider configurations to the global config so they survive dispose()
     for (const cp of customProviders) {
@@ -178,6 +343,7 @@ async function restoreProviderCredentials(
         await client.global.config.update({
           config: { provider: { [cp.providerId]: providerConfig } },
         });
+        restoredCustomProviderCount += 1;
       } catch (err) {
         console.warn(
           `[restoreProviderCredentials] Failed to restore custom provider "${cp.providerId}":`,
@@ -191,6 +357,7 @@ async function restoreProviderCredentials(
       try {
         const auth = JSON.parse(cred.authData);
         await client.auth.set({ providerID: cred.providerId, auth });
+        restoredCredentialCount += 1;
       } catch (err) {
         console.warn(
           `[restoreProviderCredentials] Failed to restore credential for "${cred.providerId}":`,
@@ -199,12 +366,24 @@ async function restoreProviderCredentials(
       }
     }
 
-    // Single dispose to reinitialise with all restored state
-    await client.global.dispose();
+    // Dispose is required when provider config is patched.
+    // For auth-only restore, skipping dispose avoids a startup-wide warmup stall.
+    const shouldDispose = restoredCustomProviderCount > 0;
+    let disposeElapsedMs = 0;
+    if (shouldDispose) {
+      const disposeStartedAt = Date.now();
+      await client.global.dispose();
+      disposeElapsedMs = Date.now() - disposeStartedAt;
+    }
 
-    console.info(
-      `[restoreProviderCredentials] Restored ${credentials.length} credential(s) and ${customProviders.length} custom provider(s).`,
-    );
+    console.info('[restoreProviderCredentials] Restore completed', {
+      profileId: input.profileId,
+      restoredCredentialCount,
+      restoredCustomProviderCount,
+      shouldDispose,
+      disposeElapsedMs,
+      totalElapsedMs: Date.now() - startedAt,
+    });
     return true;
   } catch (err) {
     console.error('[restoreProviderCredentials] Restore failed:', err);
@@ -254,9 +433,8 @@ export function useSandboxStorageInfo() {
  * Remote profiles do not call Rust docker status commands.
  */
 export function useSandboxStatus() {
-  const { scope, isLocal, endpoints, secrets } = useActiveConnection();
+  const { scope, isLocal } = useActiveConnection();
   const isMutating = useSandboxStore((s) => s.isMutating);
-  const syncInFlightRef = useRef(false);
 
   const query = useQuery({
     queryKey: SANDBOX_KEYS.status(scope),
@@ -269,8 +447,19 @@ export function useSandboxStatus() {
   // Sync local docker state into the shared UI status.
   // Preserve error state — only a new user action (start/stop) should clear it.
   useEffect(() => {
-    if (!isLocal || isMutating || isContainerRunning === undefined) return;
+    if (!isLocal || isMutating) return;
     const currentStatus = useSandboxStore.getState().status;
+
+    if (isContainerRunning === undefined) {
+      // Only show "checking" during true idle/initial polling.
+      // Do not override "running"/"starting" etc. while a fresh status value
+      // is still loading, to avoid transient status flicker.
+      if (currentStatus === 'idle') {
+        useSandboxStore.getState().setStatus('checking');
+      }
+      return;
+    }
+
     if (currentStatus === 'error') return;
     const serverStatus: SandboxStatusValue = isContainerRunning ? 'running' : 'idle';
     if (serverStatus !== currentStatus) {
@@ -288,28 +477,18 @@ export function useSandboxStatus() {
     }
 
     const project = useProjectStore.getState();
-    if (project.currentDirectory) return;
-    if (syncInFlightRef.current) return;
+    if (project.currentDirectory) {
+      useSandboxStore.getState().clearStartupPhase();
+      localProjectDetectLastRequestedAtMs.delete(scope);
+      return;
+    }
 
-    syncInFlightRef.current = true;
-    void syncProjectDirectoryFromServer({
-      baseUrl: endpoints.opencodeBaseUrl,
-      username: secrets.opencodeUsername,
-      password: secrets.opencodePassword,
-      healthTimeoutMs: 2_000,
-      healthPollMs: 300,
-    }).finally(() => {
-      syncInFlightRef.current = false;
+    useSandboxStore.getState().setStartupPhase('detecting_project');
+    void requestLocalProjectDetection({
+      scopeKey: scope,
+      source: 'status-poll-running',
     });
-  }, [
-    isLocal,
-    isMutating,
-    isContainerRunning,
-    query.dataUpdatedAt,
-    endpoints.opencodeBaseUrl,
-    secrets.opencodeUsername,
-    secrets.opencodePassword,
-  ]);
+  }, [isLocal, isMutating, isContainerRunning, query.dataUpdatedAt, scope]);
 
   return query;
 }
@@ -318,23 +497,144 @@ export function useSandboxStatus() {
  * Computed sandbox state for UI display.
  */
 export function useSandboxState(): SandboxStatusValue {
-  const { data } = useSandboxStatus();
-  const status = useSandboxStore((s) => s.status);
-  const isMutating = useSandboxStore((s) => s.isMutating);
-  const { isRemote } = useActiveConnection();
+  return useSandboxStore((s) => s.status);
+}
 
-  if (isRemote) {
-    return status;
-  }
+export function useSandboxStartupProgress() {
+  const phase = useSandboxStore((s) => s.startupPhase);
+  const phaseSinceMs = useSandboxStore((s) => s.startupPhaseSinceMs);
+  const [nowMs, setNowMs] = useState(() => Date.now());
 
-  if (isMutating) {
-    return status;
-  }
+  useEffect(() => {
+    if (phase === 'none' || !phaseSinceMs) return;
+    const timer = window.setInterval(() => {
+      setNowMs(Date.now());
+    }, 1_000);
+    return () => window.clearInterval(timer);
+  }, [phase, phaseSinceMs]);
 
-  if (status === 'error') return 'error';
+  const elapsedMs =
+    phase !== 'none' && phaseSinceMs ? Math.max(0, nowMs - phaseSinceMs) : 0;
 
-  if (!data) return 'checking';
-  return data.running ? 'running' : 'idle';
+  return { phase, elapsedMs };
+}
+
+export function useSandboxProjectDetectionEvents() {
+  const qc = useQueryClient();
+  const { isLocal, scope } = useActiveConnection();
+
+  useEffect(() => {
+    if (!isLocal) return;
+
+    let disposed = false;
+    let unlistenDetecting: UnlistenFn | null = null;
+    let unlistenDetected: UnlistenFn | null = null;
+    let unlistenTimeout: UnlistenFn | null = null;
+
+    const attachListeners = async () => {
+      try {
+        const unlisten = await listen<SandboxProjectDetectingEvent>(
+          'sandbox-project-detecting',
+          (event) => {
+            localProjectDetectLastRequestedAtMs.set(scope, Date.now());
+            useSandboxStore.getState().setStartupPhase('detecting_project');
+            console.info('[project-sync] local project detection started', {
+              scopeKey: scope,
+              trigger: event.payload.trigger,
+            });
+          },
+        );
+        if (disposed) {
+          unlisten();
+        } else {
+          unlistenDetecting = unlisten;
+        }
+      } catch (error) {
+        console.warn('[project-sync] failed to listen project detecting event', {
+          scopeKey: scope,
+          error: error instanceof Error ? error.message : String(error),
+        });
+      }
+
+      try {
+        const unlisten = await listen<SandboxProjectDetectedEvent>(
+          'sandbox-project-detected',
+          (event) => {
+            const directory = event.payload.directory?.trim();
+            if (!directory) return;
+
+            const project = useProjectStore.getState();
+            if (project.currentDirectory !== directory) {
+              project.setDirectory(directory);
+            }
+
+            localProjectDetectLastRequestedAtMs.delete(scope);
+            useSandboxStore.getState().clearStartupPhase();
+            void qc.invalidateQueries({ queryKey: ['project', scope] });
+            console.info('[project-sync] local directory synced', {
+              scopeKey: scope,
+              trigger: event.payload.trigger,
+              directory,
+              elapsedMs: event.payload.elapsed_ms,
+            });
+          },
+        );
+        if (disposed) {
+          unlisten();
+        } else {
+          unlistenDetected = unlisten;
+        }
+      } catch (error) {
+        console.warn('[project-sync] failed to listen project detected event', {
+          scopeKey: scope,
+          error: error instanceof Error ? error.message : String(error),
+        });
+      }
+
+      try {
+        const unlisten = await listen<SandboxProjectDetectTimeoutEvent>(
+          'sandbox-project-detect-timeout',
+          (event) => {
+            console.warn('[project-sync] local project detection timed out', {
+              scopeKey: scope,
+              trigger: event.payload.trigger,
+              elapsedMs: event.payload.elapsed_ms,
+              reason: event.payload.reason,
+            });
+          },
+        );
+        if (disposed) {
+          unlisten();
+        } else {
+          unlistenTimeout = unlisten;
+        }
+      } catch (error) {
+        console.warn('[project-sync] failed to listen project timeout event', {
+          scopeKey: scope,
+          error: error instanceof Error ? error.message : String(error),
+        });
+      }
+    };
+
+    void attachListeners();
+
+    return () => {
+      disposed = true;
+      localProjectDetectLastRequestedAtMs.delete(scope);
+      if (unlistenDetecting) {
+        unlistenDetecting();
+        unlistenDetecting = null;
+      }
+      if (unlistenDetected) {
+        unlistenDetected();
+        unlistenDetected = null;
+      }
+      if (unlistenTimeout) {
+        unlistenTimeout();
+        unlistenTimeout = null;
+      }
+    };
+  }, [isLocal, qc, scope]);
 }
 
 /**
@@ -346,8 +646,10 @@ export function useConnectRemote() {
 
   return useMutation({
     onMutate: async () => {
-      useSandboxStore.getState().setStatus('connecting');
-      useSandboxStore.getState().setMutating(true);
+      const store = useSandboxStore.getState();
+      store.setStatus('connecting');
+      store.setMutating(true);
+      store.clearStartupPhase();
       await qc.cancelQueries({ queryKey: SANDBOX_KEYS.status(scope) });
     },
     mutationFn: async () => {
@@ -362,21 +664,27 @@ export function useConnectRemote() {
       return 'connected';
     },
     onSuccess: async () => {
-      useSandboxStore.getState().setMutating(false);
-      await syncProjectDirectoryFromServer({
+      const store = useSandboxStore.getState();
+      store.setStatus('running');
+      store.setMutating(false);
+      void syncProjectDirectoryFromServer({
         baseUrl: endpoints.opencodeBaseUrl,
         username: secrets.opencodeUsername,
         password: secrets.opencodePassword,
+        skipHealthCheck: true,
+        source: 'remote-connect-success',
+        scopeKey: scope,
       });
-      useSandboxStore.getState().setStatus('running');
       void qc.invalidateQueries({ queryKey: SANDBOX_KEYS.status(scope) });
       void qc.invalidateQueries({ queryKey: ['project', scope] });
     },
     onError: (error) => {
-      useSandboxStore.getState().setMutating(false);
+      const store = useSandboxStore.getState();
+      store.setMutating(false);
+      store.clearStartupPhase();
       const message =
         error instanceof Error ? error.message : 'Failed to connect remote';
-      useSandboxStore.getState().setError(message);
+      store.setError(message);
       toast.error('Remote connection failed', { description: message });
     },
   });
@@ -396,17 +704,21 @@ export function useDisconnectRemote() {
     },
     mutationFn: async () => 'disconnected',
     onSuccess: () => {
-      useSandboxStore.getState().setMutating(false);
-      useSandboxStore.getState().setStatus('idle');
+      const store = useSandboxStore.getState();
+      store.setMutating(false);
+      store.setStatus('idle');
+      store.clearStartupPhase();
       void qc.invalidateQueries({ queryKey: SANDBOX_KEYS.status(scope) });
       void qc.invalidateQueries({ queryKey: ['project', scope] });
       clearProjectDirectory();
     },
     onError: (error) => {
-      useSandboxStore.getState().setMutating(false);
+      const store = useSandboxStore.getState();
+      store.setMutating(false);
+      store.clearStartupPhase();
       const message =
         error instanceof Error ? error.message : 'Failed to disconnect remote';
-      useSandboxStore.getState().setError(message);
+      store.setError(message);
       toast.error('Remote disconnect failed', { description: message });
     },
   });
@@ -420,12 +732,18 @@ export function useStartSandbox() {
   const { profile, scope, isRemote, endpoints, secrets } =
     useActiveConnection();
   const unlistenRef = useRef<UnlistenFn | null>(null);
+  const startupPhaseUnlistenRef = useRef<UnlistenFn | null>(null);
 
   return useMutation({
     onMutate: async () => {
-      useSandboxStore.getState().setStatus(isRemote ? 'connecting' : 'pulling');
-      useSandboxStore.getState().setMutating(true);
-      useSandboxStore.getState().clearPullProgress();
+      const store = useSandboxStore.getState();
+      store.setStatus(isRemote ? 'connecting' : 'starting');
+      store.setMutating(true);
+      store.clearPullProgress();
+      store.clearStartupPhase();
+      if (!isRemote) {
+        store.setStartupPhase('starting_container');
+      }
       await qc.cancelQueries({ queryKey: SANDBOX_KEYS.status(scope) });
 
       if (!isRemote) {
@@ -435,12 +753,31 @@ export function useStartSandbox() {
             (event) => {
               const { percent, message, layers_done, layers_total } = event.payload;
               const store = useSandboxStore.getState();
+              if (store.status !== 'pulling') {
+                store.setStatus('pulling');
+              }
               store.setPullProgress(percent, message, layers_done, layers_total);
               store.updatePullLog(message);
             },
           );
         } catch (err) {
           console.warn('[useStartSandbox] Failed to listen for pull progress:', err);
+        }
+
+        try {
+          startupPhaseUnlistenRef.current = await listen<StartupPhaseEvent>(
+            'sandbox-startup-phase',
+            (event) => {
+              const nextPhase = event.payload.phase;
+              if (nextPhase === 'opencode_healthy') return;
+              useSandboxStore.getState().setStartupPhase(nextPhase);
+            },
+          );
+        } catch (err) {
+          console.warn(
+            '[useStartSandbox] Failed to listen for sandbox startup phase:',
+            err,
+          );
         }
       }
     },
@@ -451,38 +788,48 @@ export function useStartSandbox() {
           username: secrets.opencodeUsername,
           password: secrets.opencodePassword,
         });
-        return 'connected';
+        return { mode: 'remote' as const };
       }
 
-      return invoke<string>('start_sandbox', {
+      const startResult = await invoke<SandboxStartResult>('start_sandbox', {
         config: config ?? null,
       });
+      return { mode: 'local' as const, startResult };
     },
-    onSuccess: async () => {
-      useSandboxStore.getState().setMutating(false);
-      if (isRemote) {
-        await syncProjectDirectoryFromServer({
+    onSuccess: async (result) => {
+      const store = useSandboxStore.getState();
+      if (result.mode === 'remote') {
+        store.clearStartupPhase();
+        store.setStatus('running');
+        store.setMutating(false);
+        void syncProjectDirectoryFromServer({
           baseUrl: endpoints.opencodeBaseUrl,
           username: secrets.opencodeUsername,
           password: secrets.opencodePassword,
+          skipHealthCheck: true,
+          source: 'remote-start-success',
+          scopeKey: scope,
         });
-        useSandboxStore.getState().setStatus('running');
       } else {
-        await syncProjectDirectoryFromServer({
-          baseUrl: endpoints.opencodeBaseUrl,
-          username: secrets.opencodeUsername,
-          password: secrets.opencodePassword,
-          healthTimeoutMs: 20_000,
-          healthPollMs: 500,
-        });
+        store.setStatus('starting');
 
-        // Restore provider credentials from local SQLite into the fresh sandbox
-        await restoreProviderCredentials({
-          profileId: profile.id,
-          baseUrl: endpoints.opencodeBaseUrl,
-          username: secrets.opencodeUsername,
-          password: secrets.opencodePassword,
-        });
+        if (result.startResult.created_fresh) {
+          // Restore provider credentials only for fresh containers.
+          // Reused containers already persist OpenCode auth/config state.
+          await restoreProviderCredentials({
+            profileId: profile.id,
+            baseUrl: endpoints.opencodeBaseUrl,
+            username: secrets.opencodeUsername,
+            password: secrets.opencodePassword,
+          });
+        } else {
+          console.info('[useStartSandbox] skip credential restore for reused container', {
+            containerId: result.startResult.container_id,
+          });
+        }
+
+        store.setStatus('running');
+        store.setMutating(false);
       }
       void qc.invalidateQueries({ queryKey: SANDBOX_KEYS.status(scope) });
       void qc.invalidateQueries({ queryKey: SANDBOX_KEYS.storage(scope) });
@@ -490,16 +837,22 @@ export function useStartSandbox() {
       void qc.invalidateQueries({ queryKey: CONFIG_KEYS.all(scope) });
     },
     onError: (error) => {
-      useSandboxStore.getState().setMutating(false);
+      const store = useSandboxStore.getState();
+      store.setMutating(false);
+      store.clearStartupPhase();
       const message =
         error instanceof Error ? error.message : 'Failed to start sandbox';
-      useSandboxStore.getState().setError(message);
+      store.setError(message);
       toast.error('Sandbox failed to start', { description: message });
     },
     onSettled: () => {
       if (unlistenRef.current) {
         unlistenRef.current();
         unlistenRef.current = null;
+      }
+      if (startupPhaseUnlistenRef.current) {
+        startupPhaseUnlistenRef.current();
+        startupPhaseUnlistenRef.current = null;
       }
       useSandboxStore.getState().clearPullProgress();
     },
@@ -515,8 +868,10 @@ export function useStopSandbox() {
 
   return useMutation({
     onMutate: async () => {
-      useSandboxStore.getState().setStatus(isRemote ? 'stopping' : 'stopping');
-      useSandboxStore.getState().setMutating(true);
+      const store = useSandboxStore.getState();
+      store.setStatus(isRemote ? 'stopping' : 'stopping');
+      store.setMutating(true);
+      store.clearStartupPhase();
       await qc.cancelQueries({ queryKey: SANDBOX_KEYS.status(scope) });
     },
     mutationFn: async () => {
@@ -526,9 +881,11 @@ export function useStopSandbox() {
       return invoke<string>('stop_sandbox');
     },
     onSuccess: () => {
-      useSandboxStore.getState().setMutating(false);
+      const store = useSandboxStore.getState();
+      store.setMutating(false);
+      store.clearStartupPhase();
       if (isRemote) {
-        useSandboxStore.getState().setStatus('idle');
+        store.setStatus('idle');
       }
       void qc.invalidateQueries({ queryKey: SANDBOX_KEYS.status(scope) });
       void qc.invalidateQueries({ queryKey: SANDBOX_KEYS.storage(scope) });
@@ -536,10 +893,12 @@ export function useStopSandbox() {
       clearProjectDirectory();
     },
     onError: (error) => {
-      useSandboxStore.getState().setMutating(false);
+      const store = useSandboxStore.getState();
+      store.setMutating(false);
+      store.clearStartupPhase();
       const message =
         error instanceof Error ? error.message : 'Failed to stop sandbox';
-      useSandboxStore.getState().setError(message);
+      store.setError(message);
       toast.error('Sandbox failed to stop', { description: message });
     },
   });
@@ -561,9 +920,11 @@ export function useResetSandboxStorage() {
       });
     },
     onSuccess: () => {
-      useSandboxStore.getState().setMutating(false);
+      const store = useSandboxStore.getState();
+      store.setMutating(false);
+      store.clearStartupPhase();
       if (isLocal) {
-        useSandboxStore.getState().setStatus('idle');
+        store.setStatus('idle');
         clearProjectDirectory();
         void qc.invalidateQueries({ queryKey: SANDBOX_KEYS.status(scope) });
         void qc.invalidateQueries({ queryKey: SANDBOX_KEYS.storage(scope) });
@@ -572,17 +933,21 @@ export function useResetSandboxStorage() {
       }
     },
     onError: (error) => {
-      useSandboxStore.getState().setMutating(false);
+      const store = useSandboxStore.getState();
+      store.setMutating(false);
+      store.clearStartupPhase();
       const message =
         error instanceof Error
           ? error.message
           : 'Failed to reset sandbox storage';
-      useSandboxStore.getState().setError(message);
+      store.setError(message);
       toast.error('Sandbox reset failed', { description: message });
     },
     onMutate: () => {
-      useSandboxStore.getState().setMutating(true);
-      useSandboxStore.getState().setStatus('stopping');
+      const store = useSandboxStore.getState();
+      store.setMutating(true);
+      store.setStatus('stopping');
+      store.clearStartupPhase();
     },
   });
 }
