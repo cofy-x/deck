@@ -1,6 +1,6 @@
 # Project Overview
 
-**deck** is a polyglot monorepo by **cofy-x** for AI-driven infrastructure and developer tools. It provides a secure, local-first sandbox for autonomous AI agents, along with a desktop cockpit and a messaging bridge suite (Pilot).
+**deck** is a polyglot monorepo by **cofy-x** for AI-driven infrastructure and developer tools. It provides a secure, local-first sandbox for autonomous AI agents, along with a desktop cockpit and an optional Pilot automation suite.
 
 ## Workspace Managers
 
@@ -18,10 +18,10 @@ deck/
 ├── apps/                          # Deployable applications
 │   ├── api/                       # NestJS BFF (Fastify, Drizzle, BullMQ, PostgreSQL, Redis)
 │   ├── cli/                       # Go CLI — MCP tool server for AI agent sandbox ops
-│   ├── client/                    # Tauri v2 desktop app — AI sandbox cockpit
+│   ├── client/                    # Tauri v2 desktop app — AI sandbox cockpit (primary user-facing surface)
 │   ├── dashboard/                 # React + Vite admin web UI
 │   ├── landing/                   # React + Vite marketing website
-│   ├── pilot/                     # Pilot suite
+│   ├── pilot/                     # Optional Pilot automation suite (current operational entrypoint)
 │   │   ├── bridge/                # Messaging bridge (WhatsApp, Telegram, Slack, Feishu, Discord, DingTalk, Email, Mochat, QQ)
 │   │   ├── host/                  # Headless CLI orchestrator
 │   │   └── server/                # Filesystem API server for sandboxes
@@ -90,6 +90,8 @@ sequenceDiagram
     Pilot->>Daemon: Interact with sandbox
     Pilot->>Pilot: Bridge messages (WhatsApp/Telegram/Slack/Feishu/Discord/DingTalk/Email/Mochat/QQ)
 ```
+
+Note: `apps/client` currently includes Pilot runtime orchestration primitives, but first-class Pilot UI workflows are not shipped in the cockpit yet.
 
 ## Root Configuration Files
 

@@ -32,6 +32,16 @@ apps/client/
         └── pilot_runtime/  # Pilot host/server/bridge orchestration runtime
 ```
 
+## Pilot Runtime Boundary
+
+`src-tauri/src/pilot_runtime/` provides backend runtime orchestration for Pilot sidecars (process control and health checks).
+
+Current product boundary:
+
+- No first-class Pilot UI pages or top-level Pilot actions are shipped in `apps/client` yet.
+- Pilot operational workflows are still run via `apps/pilot/{host,server,bridge}`.
+- Cockpit-facing Pilot UX should be treated as roadmap or incremental scope until explicitly shipped.
+
 ## Connection Model
 
 ### Profiles

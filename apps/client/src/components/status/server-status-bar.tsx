@@ -59,6 +59,7 @@ function StatusPill({
   variant,
   onClick,
   ariaLabel,
+  compactOnSmall = false,
 }: {
   icon: React.ComponentType<{ className?: string }>;
   label: string;
@@ -67,6 +68,7 @@ function StatusPill({
   variant: 'ok' | 'warn' | 'idle';
   onClick?: () => void;
   ariaLabel?: string;
+  compactOnSmall?: boolean;
 }) {
   const interactive = !!onClick;
 
@@ -89,14 +91,17 @@ function StatusPill({
                 'inline-flex items-center gap-1 rounded-md border px-1.5 py-0 text-[10px] font-normal transition-colors',
                 'focus-visible:ring-ring focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-offset-2',
                 'hover:bg-muted/60',
+                compactOnSmall && 'gap-0.5 px-1 xl:gap-1 xl:px-1.5',
                 variant === 'ok' && 'border-green-500/30 text-green-400',
                 variant === 'warn' && 'border-yellow-500/30 text-yellow-400',
                 variant === 'idle' && 'border-muted-foreground/30',
               )}
             >
               <Icon className="h-3 w-3" />
-              <span>{label}</span>
-              <span>
+              <span className={cn(compactOnSmall && 'hidden xl:inline')}>
+                {label}
+              </span>
+              <span className="tabular-nums">
                 {count}/{total}
               </span>
             </button>
@@ -105,14 +110,17 @@ function StatusPill({
               variant="outline"
               className={cn(
                 'flex items-center gap-1 px-1.5 py-0 text-[10px] font-normal cursor-default',
+                compactOnSmall && 'gap-0.5 px-1 xl:gap-1 xl:px-1.5',
                 variant === 'ok' && 'border-green-500/30 text-green-400',
                 variant === 'warn' && 'border-yellow-500/30 text-yellow-400',
                 variant === 'idle' && 'border-muted-foreground/30',
               )}
             >
               <Icon className="h-3 w-3" />
-              <span>{label}</span>
-              <span>
+              <span className={cn(compactOnSmall && 'hidden xl:inline')}>
+                {label}
+              </span>
+              <span className="tabular-nums">
                 {count}/{total}
               </span>
             </Badge>
@@ -265,6 +273,7 @@ export function ServerStatusBar({
           label={t('status.formatter')}
           count={fmtStats.enabled}
           total={fmtStats.total}
+          compactOnSmall
           variant={
             fmtStats.enabled === fmtStats.total
               ? 'ok'

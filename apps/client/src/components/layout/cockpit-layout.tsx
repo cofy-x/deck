@@ -43,6 +43,7 @@ import {
 import { ChatPanel } from '@/components/chat/chat-panel';
 import { RightPanel } from '@/components/viewer/right-panel';
 import { SettingsSheet } from '@/components/config/settings-sheet';
+import { ProjectOpenActions } from '@/components/layout/project-open-actions';
 import { ProjectPickerDialog } from '@/components/project/project-picker-dialog';
 import { ServerStatusBar } from '@/components/status/server-status-bar';
 import { SandboxStatusBadge } from '@/components/sandbox/status-badge';
@@ -294,6 +295,11 @@ export function CockpitLayout() {
               </Tooltip>
             </TooltipProvider>
           )}
+          <ProjectOpenActions
+            currentDirectory={currentDirectory}
+            isLocal={isLocal}
+            sandboxStatus={sandboxStatus}
+          />
           {sandboxStatus === 'running' && (
             <>
               <Separator orientation="vertical" className="mx-1 h-4 shrink-0" />
