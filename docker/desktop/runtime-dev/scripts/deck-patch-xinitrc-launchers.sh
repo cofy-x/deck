@@ -2,7 +2,7 @@
 set -eu
 
 xinitrc="/etc/xdg/xfce4/xinitrc"
-marker="deck-fix-chrome-launcher"
+marker="deck-fix-desktop-launchers"
 
 if [ ! -f "$xinitrc" ]; then
   echo "xinitrc not found: $xinitrc" >&2
@@ -16,8 +16,8 @@ fi
 tmp_xinitrc="$(mktemp /tmp/xinitrc.XXXXXX)"
 
 awk 'BEGIN { inserted = 0 } /# check if we start xfce4-session with ck-launch-session/ && inserted == 0 {
-  print "if [ -x /usr/local/bin/deck-fix-chrome-launcher ]; then"
-  print "  DECK_CHROME_TRUST_FIX_WAIT_SECONDS=1 DECK_CHROME_TRUST_FIX_WATCH_SECONDS=300 /usr/local/bin/deck-fix-chrome-launcher >/tmp/deck-fix-chrome-launcher.log 2>&1 &"
+  print "if [ -x /usr/local/bin/deck-fix-desktop-launchers ]; then"
+  print "  DECK_LAUNCHER_TRUST_FIX_WAIT_SECONDS=1 DECK_LAUNCHER_TRUST_FIX_WATCH_SECONDS=300 /usr/local/bin/deck-fix-desktop-launchers >/tmp/deck-fix-desktop-launchers.log 2>&1 &"
   print "fi"
   print ""
   inserted = 1
