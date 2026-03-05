@@ -2,6 +2,17 @@ name: Docker Desktop Images
 
 on:
   workflow_dispatch:
+  push:
+    branches:
+      - main
+    paths:
+      - 'docker/desktop/**'
+      - 'docker/plugins/computer-use/**'
+      - 'packages/daemon/**'
+      - 'apps/cli/**'
+      - 'go.work'
+      - 'go.work.sum'
+      - '.github/workflows/docker-desktop-images.yml'
 
 permissions:
   contents: read
