@@ -1,0 +1,154 @@
+---
+description: Git commit and GitHub PR workflow using gh CLI
+alwaysApply: false
+---
+# Git Commit and PR Workflow
+
+When creating commits and pull requests, follow this standardized workflow.
+
+## Commit Message Format
+
+Follow Conventional Commits format:
+
+```
+<type>(<scope>): <subject>
+
+<body>
+```
+
+**Common types:**
+- `feat`: New feature
+- `fix`: Bug fix
+- `refactor`: Code refactoring
+- `docs`: Documentation changes
+- `ci`: CI/CD configuration changes
+- `chore`: Maintenance tasks
+- `test`: Test changes
+
+**Examples from this repo:**
+```
+ci: enable auto-trigger for client-build and docker-desktop-images workflows
+fix(client): improve sandbox cold-start reliability and project sync
+feat(client): add sandbox image pull progress and cancel support
+```
+
+## Git + PR Workflow Steps
+
+### 1. Check Status (Parallel)
+
+Run these commands in parallel to understand current state:
+
+```bash
+git status
+git diff
+git log -5 --oneline
+```
+
+### 2. Create Branch and Commit
+
+```bash
+git checkout -b <branch-name>
+git add <files>
+git commit -m "$(cat <<'EOF'
+<type>(<scope>): <subject>
+
+<detailed description>
+EOF
+)"
+```
+
+**Branch naming:**
+- `feat/<feature-name>` - New features
+- `fix/<bug-name>` - Bug fixes
+- `ci/<change-name>` - CI/CD changes
+- `docs/<doc-name>` - Documentation
+- `refactor/<refactor-name>` - Refactoring
+
+### 3. Push Branch
+
+```bash
+git push -u origin HEAD
+```
+
+### 4. Create PR with gh CLI
+
+```bash
+gh pr create \
+  --title "<type>(<scope>): <subject>" \
+  --body "$(cat <<'EOF'
+## Summary
+
+- Bullet point summary of changes
+
+## Changes
+
+### Component/File 1
+- Change description
+
+### Component/File 2
+- Change description
+
+## Test Plan
+
+- [ ] Test item 1
+- [ ] Test item 2
+
+EOF
+)"
+```
+
+### 5. Handle gh CLI Issues
+
+If `gh` CLI fails due to SSH alias in remote URL:
+
+1. Check if branch is already on GitHub:
+   ```bash
+   gh api repos/cofy-x/deck/branches/<branch-name> --jq '.name'
+   ```
+
+2. Create PR using API directly:
+   ```bash
+   gh api repos/cofy-x/deck/pulls \
+     -f title="<title>" \
+     -f head="<branch-name>" \
+     -f base="main" \
+     -f body="<body>" \
+     --jq '.html_url'
+   ```
+
+3. Check if PR already exists:
+   ```bash
+   gh api repos/cofy-x/deck/pulls \
+     --jq '.[] | select(.head.ref == "<branch-name>") | {number, title, html_url, state}'
+   ```
+
+## CHANGELOG Updates
+
+**Do NOT update CHANGELOG for:**
+- CI/CD workflow changes
+- Internal tooling updates
+- Development process improvements
+
+**DO update CHANGELOG for:**
+- User-facing features
+- Bug fixes
+- Breaking changes
+- API changes
+
+## Sequential Operations
+
+Always use `&&` to chain dependent operations:
+
+```bash
+git checkout -b branch && git add . && git commit -m "message" && git push -u origin HEAD
+```
+
+## Verification After Merge
+
+After PR is merged, verify:
+
+```bash
+git checkout main
+git pull
+git status
+```
