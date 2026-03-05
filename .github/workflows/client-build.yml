@@ -2,6 +2,24 @@ name: Client Build
 
 on:
   workflow_dispatch:
+  pull_request:
+    paths:
+      - 'apps/client/**'
+      - 'packages/client-daemon-*/**'
+      - 'packages/core-ts/**'
+      - 'pnpm-lock.yaml'
+      - '.nvmrc'
+      - '.github/workflows/client-build.yml'
+  push:
+    branches:
+      - main
+    paths:
+      - 'apps/client/**'
+      - 'packages/client-daemon-*/**'
+      - 'packages/core-ts/**'
+      - 'pnpm-lock.yaml'
+      - '.nvmrc'
+      - '.github/workflows/client-build.yml'
 
 permissions:
   contents: read
