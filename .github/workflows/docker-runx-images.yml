@@ -1,0 +1,112 @@
+name: Docker Runx Images
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+    paths:
+      - 'docker/runx/**'
+      - '.github/workflows/docker-runx-images.yml'
+
+permissions:
+  contents: read
+  packages: write
+
+env:
+  REGISTRY: ghcr.io
+  OWNER: ${{ github.repository_owner }}
+  IMAGE_NS: ghcr.io/${{ github.repository_owner }}/deck
+  SHA_TAG: sha-${{ github.sha }}
+
+jobs:
+  build-and-push:
+    name: Build and Push Runx Images (amd64)
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Login to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Discover and build runx images
+        shell: bash
+        run: |
+          set -euo pipefail
+          
+          echo "Discovering runx image directories..."
+          for dir in docker/runx/*/; do
+            if [ -f "${dir}build.sh" ]; then
+              image_dir=$(basename "$dir")
+              echo "Building ${image_dir}..."
+              (cd "$dir" && bash build.sh aliyun amd64)
+            fi
+          done
+
+      - name: Tag and push images to GHCR
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          tag_and_push() {
+            local source_image="$1"
+            local target_repo="$2"
+
+            docker tag "${source_image}" "${target_repo}:latest"
+            docker tag "${source_image}" "${target_repo}:${SHA_TAG}"
+
+            docker push "${target_repo}:latest"
+            docker push "${target_repo}:${SHA_TAG}"
+          }
+
+          # Discover and push all runx images
+          for dir in docker/runx/*/; do
+            if [ -f "${dir}build.sh" ]; then
+              image_dir=$(basename "$dir")
+              # Convert directory name to image name (e.g., base-jdk21 -> runx-base-jdk21)
+              image_name="runx-${image_dir}"
+              source_image="deck/${image_name}:0.0.1-aliyun-amd64"
+              target_repo="${IMAGE_NS}/${image_name}"
+              
+              echo "Pushing ${image_name}..."
+              tag_and_push "${source_image}" "${target_repo}"
+            fi
+          done
+
+      - name: Image summary and job report
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          echo "Built image list:"
+          if command -v rg >/dev/null 2>&1; then
+            docker images --format '{{.Repository}}:{{.Tag}}' | rg '^deck/runx-|^ghcr\.io/.*/deck/runx-'
+          else
+            docker images --format '{{.Repository}}:{{.Tag}}' | grep -E '^deck/runx-|^ghcr\.io/.*/deck/runx-'
+          fi
+
+          {
+            echo "## Runx Image Publish Summary"
+            echo ""
+            echo "- Registry: \`${REGISTRY}\`"
+            echo "- Namespace: \`${IMAGE_NS}\`"
+            echo "- Commit: \`${GITHUB_SHA}\`"
+            echo "- SHA Tag: \`${SHA_TAG}\`"
+            echo ""
+            echo "### Published Images"
+            
+            for dir in docker/runx/*/; do
+              if [ -f "${dir}build.sh" ]; then
+                image_dir=$(basename "$dir")
+                image_name="runx-${image_dir}"
+                echo "- \`${IMAGE_NS}/${image_name}:latest\`"
+                echo "- \`${IMAGE_NS}/${image_name}:${SHA_TAG}\`"
+              fi
+            done
+          } >> "${GITHUB_STEP_SUMMARY}"

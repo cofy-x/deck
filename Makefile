@@ -55,14 +55,15 @@ CLI_BIN    := cli
 .PHONY: all help install build test lint clean \
         install-ts build-ts build-landing build-landing-image \
         install-go download-xterm build-go build-linux build-darwin build-darwin-amd64 \
-		build-windows build-all-platforms fmt-go lint-go test-go \
-		docker-dev-up docker-dev-down \
-		run-api run-dashboard run-landing \
-		pilot-build pilot-build-host pilot-build-server pilot-build-bridge \
-		pilot-test pilot-test-host pilot-test-server pilot-test-bridge \
-		pilot-env-init pilot-bridge-env-init \
-		pilot-run-server pilot-run-bridge pilot-run-host-external pilot-status \
-		build-cli build-cli-linux build-cli-darwin-arm64 dev-cli-mcp
+	build-windows build-all-platforms fmt-go lint-go test-go \
+	docker-dev-up docker-dev-down \
+	run-api run-dashboard run-landing \
+	pilot-build pilot-build-host pilot-build-server pilot-build-bridge \
+	pilot-test pilot-test-host pilot-test-server pilot-test-bridge \
+	pilot-env-init pilot-bridge-env-init \
+	pilot-run-server pilot-run-bridge pilot-run-host-external pilot-status \
+	build-cli build-cli-linux build-cli-darwin-arm64 dev-cli-mcp \
+	runx-check-network runx-build-base-jdk21 runx-test-base-jdk21 runx-run-base-jdk21 runx-build-all
 
 # ------------------------------------------------------------------------------
 # Default Target & Help
@@ -289,6 +290,49 @@ build-cli-sandbox-ai: build-cli-runtime-ai build-daemon-linux build-cli-linux ##
 
 run-cli-sandbox-ai: build-cli-sandbox-ai ## Run the cli sandbox ai image
 	@cd docker/cli/sandbox-ai && bash run.sh
+
+
+# --- Hack Docker Runx Build ---
+
+runx-check-network: ## Check network connectivity and set proxy if needed
+	@echo "Checking network connectivity..."
+	@if curl -s --connect-timeout 3 https://hub.docker.com >/dev/null 2>&1; then \
+		echo "✓ Direct connection to Docker Hub available"; \
+	elif curl -s --connect-timeout 3 -x http://127.0.0.1:7890 https://hub.docker.com >/dev/null 2>&1; then \
+		echo "✓ Proxy connection available at 127.0.0.1:7890"; \
+		echo "Setting Docker proxy environment variables..."; \
+		export HTTP_PROXY=http://127.0.0.1:7890; \
+		export HTTPS_PROXY=http://127.0.0.1:7890; \
+	else \
+		echo "⚠ Warning: Network connectivity issues detected"; \
+		echo "  - Direct connection failed"; \
+		echo "  - Proxy at 127.0.0.1:7890 not available"; \
+		echo "  - Build may be slow or fail"; \
+	fi
+
+runx-build-base-jdk21: ## Build runx base-jdk21 image
+	@echo "Building runx base-jdk21..."
+	@if curl -s --connect-timeout 3 https://hub.docker.com >/dev/null 2>&1; then \
+		cd docker/runx/base-jdk21 && bash build.sh aliyun amd64; \
+	elif curl -s --connect-timeout 3 -x http://127.0.0.1:7890 https://hub.docker.com >/dev/null 2>&1; then \
+		echo "Using proxy at 127.0.0.1:7890..."; \
+		cd docker/runx/base-jdk21 && \
+		HTTP_PROXY=http://127.0.0.1:7890 HTTPS_PROXY=http://127.0.0.1:7890 \
+		bash build.sh aliyun amd64; \
+	else \
+		echo "Warning: No network connectivity, attempting build anyway..."; \
+		cd docker/runx/base-jdk21 && bash build.sh aliyun amd64; \
+	fi
+
+runx-test-base-jdk21: ## Test runx base-jdk21 image
+	@echo "Testing runx base-jdk21..."
+	@cd docker/runx/base-jdk21 && bash test.sh
+
+runx-run-base-jdk21: ## Run runx base-jdk21 container
+	@cd docker/runx/base-jdk21 && bash run.sh
+
+runx-build-all: runx-build-base-jdk21 ## Build all runx images
+	@echo "All runx images built successfully"
 
 
 # ------------------------------------------------------------------------------
